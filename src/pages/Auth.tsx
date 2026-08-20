@@ -228,9 +228,6 @@ export const Auth: React.FC = () => {
               />
               <KeyRound size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#8C9B90' }} />
             </div>
-            <span style={{ fontSize: '0.75rem', color: '#5C6C62', display: 'block', marginTop: '6px' }}>
-              * Enter default code <strong>123456</strong> for testing verification.
-            </span>
           </div>
 
           {/* Resend OTP countdown/button */}
