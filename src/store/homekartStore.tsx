@@ -720,7 +720,7 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const useMockOtp = sessionStorage.getItem('homekart_use_mock_otp') === 'true';
 
     if (isSupabaseConfigured && !useMockOtp) {
-      const { user: authUser, error } = await authService.verifyOtp(tempMobile, otp);
+      const { user: authUser, error } = await authService.verifyOtp(tempMobile, otp, tempName);
       if (error || !authUser) {
         await addNotification(`Verification failed: ${error || 'Invalid OTP'}`, 'error');
         return false;
@@ -729,11 +729,11 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setAuthUserId(authUser.id);
       
       // Fetch profile to check if it's existing or new
-      const existingProfile = await authService.getProfile(authUser.id, tempMobile);
+      const existingProfile = await authService.getProfile(authUser.id, tempMobile, tempName);
       let finalName = existingProfile.name;
       
       // If the profile name is default (new user registration) and we have tempName, update it!
-      if ((existingProfile.name === 'Homekart Customer' || !existingProfile.name) && tempName) {
+      if ((existingProfile.name === 'Homekart Customer' || !existingProfile.name || existingProfile.name === '') && tempName) {
         await authService.updateProfileName(authUser.id, tempName);
         finalName = tempName;
       }

@@ -21,14 +21,14 @@ export const authService = {
     return { success: true, error: null };
   },
 
-  async verifyOtp(phone: string, otp: string): Promise<{ user: any; profile: UserProfile | null; error: string | null }> {
+  async verifyOtp(phone: string, otp: string, fullName?: string): Promise<{ user: any; profile: UserProfile | null; error: string | null }> {
     const formattedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
 
     if (!isSupabaseConfigured) {
       // Mock session
       const mockUser = { id: 'mock-user-uuid', phone: formattedPhone };
       const mockProfile: UserProfile = {
-        name: 'Divya Karwande',
+        name: fullName || 'Divya Karwande',
         mobile: phone,
         referralCode: 'DIVYA840',
         referralEarnings: 450,
@@ -54,7 +54,7 @@ export const authService = {
     }
 
     const user = data.user;
-    const profile = user ? await this.getProfile(user.id, phone) : null;
+    const profile = user ? await this.getProfile(user.id, phone, fullName) : null;
     return { user, profile, error: null };
   },
 
@@ -64,9 +64,9 @@ export const authService = {
     }
   },
 
-  async getProfile(userId: string, fallbackPhone: string): Promise<UserProfile> {
+  async getProfile(userId: string, fallbackPhone: string, fullName?: string): Promise<UserProfile> {
     const defaultProfile: UserProfile = {
-      name: 'Homekart Customer',
+      name: fullName || 'Homekart Customer',
       mobile: fallbackPhone,
       referralCode: `HK${userId.slice(0, 5).toUpperCase()}`,
       referralEarnings: 0,
@@ -92,7 +92,7 @@ export const authService = {
         .from('profiles')
         .insert({
           id: userId,
-          full_name: 'Homekart Customer',
+          full_name: fullName || 'Homekart Customer',
           phone: fallbackPhone
         })
         .select()
@@ -100,8 +100,8 @@ export const authService = {
         
       if (insertData) {
         return {
-          name: insertData.full_name,
-          mobile: insertData.phone,
+          name: insertData.full_name || fullName || 'Homekart Customer',
+          mobile: insertData.phone || fallbackPhone,
           referralCode: `HK${userId.slice(0, 5).toUpperCase()}`,
           referralEarnings: 0,
           referralsCount: 0,
@@ -109,6 +109,36 @@ export const authService = {
         };
       }
       return defaultProfile;
+    }
+
+    // Update profile in DB if the stored name is default/empty but we have a real name, or if phone is missing
+    let finalName = data.full_name;
+    let finalPhone = data.phone;
+    let needsUpdate = false;
+
+    if ((!data.full_name || data.full_name === 'Homekart Customer' || data.full_name === '') && fullName) {
+      finalName = fullName;
+      needsUpdate = true;
+    }
+    if (!data.phone && fallbackPhone) {
+      finalPhone = fallbackPhone;
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      const { data: updatedData } = await supabase
+        .from('profiles')
+        .update({
+          full_name: finalName,
+          phone: finalPhone
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+      if (updatedData) {
+        finalName = updatedData.full_name;
+        finalPhone = updatedData.phone;
+      }
     }
 
     // Load referral metrics
@@ -127,8 +157,8 @@ export const authService = {
     const referralEarnings = referralsCount * 150;
 
     return {
-      name: data.full_name || 'Homekart Customer',
-      mobile: data.phone || fallbackPhone,
+      name: finalName || fullName || 'Homekart Customer',
+      mobile: finalPhone || fallbackPhone,
       referralCode: `HK${userId.slice(0, 5).toUpperCase()}`,
       referralEarnings,
       referralsCount,
