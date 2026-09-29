@@ -23,6 +23,9 @@ import Auth from './pages/Auth';
 import Settings from './pages/Settings';
 import Payment from './pages/Payment';
 import OrderSuccess from './pages/OrderSuccess';
+import AdminDashboard from './pages/AdminDashboard';
+import SupplierDashboard from './pages/SupplierDashboard';
+import SellerKyc from './pages/SellerKyc';
 
 import './App.css';
 
@@ -36,6 +39,12 @@ const MainAppContent: React.FC = () => {
         return <Home />;
       case 'shop':
         return <Shop />;
+      case 'admin':
+        return <AdminDashboard />;
+      case 'supplier':
+        return <SupplierDashboard />;
+      case 'sellerKyc':
+        return <SellerKyc />;
       case 'product':
         return <ProductDetail />;
       case 'groups':

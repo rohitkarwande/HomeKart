@@ -156,24 +156,36 @@ export const authService = {
 
     const referralEarnings = referralsCount * 150;
 
-    return {
-      name: finalName || fullName || 'Homekart Customer',
-      mobile: finalPhone || fallbackPhone,
-      referralCode: `HK${userId.slice(0, 5).toUpperCase()}`,
-      referralEarnings,
-      referralsCount,
-      referralHistory
-    };
-  },
+      return {
+        name: finalName || fullName || 'Homekart Customer',
+        mobile: finalPhone || fallbackPhone,
+        referralCode: `HK${userId.slice(0, 5).toUpperCase()}`,
+        referralEarnings,
+        referralsCount,
+        referralHistory,
+        interestedCategories: data.interested_categories || []
+      };
+    },
 
-  async updateProfileName(userId: string, fullName: string): Promise<boolean> {
-    if (!isSupabaseConfigured) return true;
+    async updateProfileName(userId: string, fullName: string): Promise<boolean> {
+      if (!isSupabaseConfigured) return true;
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ full_name: fullName })
-      .eq('id', userId);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: fullName })
+        .eq('id', userId);
 
-    return !error;
-  }
-};
+      return !error;
+    },
+
+    async updateInterestedCategories(userId: string, categories: string[]): Promise<boolean> {
+      if (!isSupabaseConfigured) return true;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ interested_categories: categories })
+        .eq('id', userId);
+
+      return !error;
+    }
+  };

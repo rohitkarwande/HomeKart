@@ -18,7 +18,12 @@ export const SEED_PRODUCTS: Product[] = [
       'Form': 'Powder/Paste'
     },
     availability: 'in-stock',
-    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'admin',
+    companyName: 'HomeKart Direct',
+    moq: 20,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
   },
   {
     id: 'da7a1000-0000-0000-0000-000000000002',
@@ -36,7 +41,12 @@ export const SEED_PRODUCTS: Product[] = [
       'Weight': '200g'
     },
     availability: 'in-stock',
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'supplier',
+    companyName: 'GlowOrganics Herbals Ltd',
+    moq: 30,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
   },
   {
     id: 'da7a1000-0000-0000-0000-000000000003',
@@ -54,7 +64,12 @@ export const SEED_PRODUCTS: Product[] = [
       'Key Benefits': 'Frizz Control & Nourishment'
     },
     availability: 'in-stock',
-    expiresAt: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString()
+    expiresAt: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'supplier',
+    companyName: 'LuxeSalon Supplies Pvt Ltd',
+    moq: 15,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
   },
   {
     id: 'da7a1000-0000-0000-0000-000000000004',
@@ -73,7 +88,12 @@ export const SEED_PRODUCTS: Product[] = [
       'Charging Time': '1.5 hours (USB-C)'
     },
     availability: 'in-stock',
-    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'admin',
+    companyName: 'HomeKart Direct',
+    moq: 10,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
   },
   {
     id: 'da7a1000-0000-0000-0000-000000000005',
@@ -92,7 +112,104 @@ export const SEED_PRODUCTS: Product[] = [
       'Battery': 'Up to 10 days'
     },
     availability: 'in-stock',
-    expiresAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+    expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'supplier',
+    companyName: 'TechGizmo Wholesale',
+    moq: 25,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
+  },
+  {
+    id: 'da7a1000-0000-0000-0000-000000000006',
+    name: 'Fresh Organic Farm Vegetables Basket (5kg Combo)',
+    description: 'Farm-fresh harvest including organic potatoes, tomatoes, onions, carrots, and fresh green spinach direct from local farmers.',
+    category: 'Vegetables & Fruits',
+    originalPrice: 450,
+    groupPrice: 299,
+    imageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80',
+    rating: 4.9,
+    reviewsCount: 230,
+    specifications: {
+      'Weight': '5kg Mixed Basket',
+      'Source': 'Certified Organic Farm',
+      'Shelf Life': '5-7 Days'
+    },
+    availability: 'in-stock',
+    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'supplier',
+    companyName: 'GreenFields Organic Agri',
+    moq: 15,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
+  },
+  {
+    id: 'da7a1000-0000-0000-0000-000000000007',
+    name: 'Exotic Salad Greens & Hass Avocado Pack',
+    description: 'Crisp hydroponic romaine lettuce, cherry tomatoes, bell peppers, and imported Hass avocados. Perfect for healthy gourmet salads.',
+    category: 'Vegetables & Fruits',
+    originalPrice: 699,
+    groupPrice: 449,
+    imageUrl: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=500&auto=format&fit=crop&q=80',
+    rating: 4.8,
+    reviewsCount: 167,
+    specifications: {
+      'Contents': 'Lettuce, Avocados, Bell Peppers',
+      'Quality': 'Grade A Hydroponic',
+      'Weight': '1.2kg'
+    },
+    availability: 'in-stock',
+    expiresAt: new Date(Date.now() + 36 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'supplier',
+    companyName: 'FreshMatrix Hydroponics',
+    moq: 10,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
+  },
+  {
+    id: 'da7a1000-0000-0000-0000-000000000008',
+    name: '100% Pure Organic Cotton Casual T-Shirt (Pack of 2)',
+    description: 'Ultra-soft, breathable combed cotton t-shirts with reinforced stitching. Eco-friendly dyes and zero color fading guarantee.',
+    category: 'Clothes & Fashion',
+    originalPrice: 1299,
+    groupPrice: 799,
+    imageUrl: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500&auto=format&fit=crop&q=80',
+    rating: 4.7,
+    reviewsCount: 145,
+    specifications: {
+      'Material': '100% Organic Cotton',
+      'Fit Type': 'Regular Comfort Fit',
+      'Colors': 'Navy Blue & Olive Green'
+    },
+    availability: 'in-stock',
+    expiresAt: new Date(Date.now() + 60 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'admin',
+    companyName: 'HomeKart Fashion Hub',
+    moq: 20,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
+  },
+  {
+    id: 'da7a1000-0000-0000-0000-000000000009',
+    name: 'Premium Stretch Denim Slim-Fit Jeans',
+    description: 'Durable stretch cotton denim jeans with classic 5-pocket styling and heavy-duty zipper hardware.',
+    category: 'Clothes & Fashion',
+    originalPrice: 2499,
+    groupPrice: 1499,
+    imageUrl: 'https://images.unsplash.com/photo-1542272604-780c36856d66?w=500&auto=format&fit=crop&q=80',
+    rating: 4.6,
+    reviewsCount: 89,
+    specifications: {
+      'Fabric': '98% Cotton, 2% Elastane',
+      'Wash': 'Dark Indigo Enzyme Wash',
+      'Closure': 'Button & Zipper'
+    },
+    availability: 'in-stock',
+    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    sellerRole: 'supplier',
+    companyName: 'UrbanStitch Apparel Co',
+    moq: 15,
+    approvalStatus: 'approved',
+    deliveryEstDate: '1 October to 7 October'
   }
 ];
 

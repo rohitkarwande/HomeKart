@@ -223,6 +223,22 @@ export const GroupDetail: React.FC = () => {
               <span style={{ fontWeight: 800, color: 'var(--color-primary)', fontSize: '1rem' }}>₹{group.savings} per item</span>
             </div>
 
+            {/* First Member Qty 5 Bonus Tip */}
+            <div style={{
+              backgroundColor: '#ECFDF5',
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid #10B981',
+              fontSize: '0.82rem',
+              color: '#065F46',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              👑 First member ordering min 5 quantity gets an extra 10% bonus discount!
+            </div>
+
             {/* Timers */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.85rem', color: '#5C6C62' }}>
               <Clock size={16} /> <span>Ends in <strong>23 hours, 45 minutes</strong></span>

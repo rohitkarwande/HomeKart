@@ -11,6 +11,7 @@ import {
 export const Orders: React.FC = () => {
   const {
     orders,
+    products,
     cancelOrder,
     completeOrder,
     simulateFriendJoin,
@@ -108,21 +109,109 @@ export const Orders: React.FC = () => {
                 <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>{new Date(selectedOrder.date).toLocaleDateString()}</span>
               </div>
 
-              {/* Items listing */}
-              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {selectedOrder.items.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: '12px' }}>
-                    <img 
-                      src={item.productImage} 
-                      alt={item.productName} 
-                      style={{ width: '48px', height: '48px', borderRadius: '4px', objectFit: 'cover' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontWeight: 700, fontSize: '0.85rem' }}>{item.productName}</p>
-                      <span style={{ fontSize: '0.75rem', color: '#5C6C62' }}>Qty: {item.quantity} · {item.isGroupBuy ? 'Group Price' : 'Regular Price'}</span>
+              {/* Refund Notice Card if Refunded */}
+              {(selectedOrder.paymentStatus === 'Refunded' || selectedOrder.refundDetails || selectedOrder.groupStatus.includes('Cancel')) && (
+                <div style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#DC2626', fontWeight: 800, fontSize: '0.95rem' }}>
+                    💸 Money Refunded
+                  </div>
+                  <p style={{ fontSize: '0.85rem', color: '#991B1B', margin: 0 }}>
+                    Amount of <strong>₹{selectedOrder.refundDetails?.amount || selectedOrder.total}</strong> has been refunded back to your original payment method.
+                  </p>
+                  <div style={{ fontSize: '0.75rem', color: '#7F1D1D' }}>
+                    Reason: {selectedOrder.refundDetails?.reason || 'Group cart MOQ target was not filled within the launch window.'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#7F1D1D', fontFamily: 'monospace' }}>
+                    Txn ID: {selectedOrder.refundDetails?.transactionId || 'REF-98410283'}
+                  </div>
+                </div>
+              )}
+
+              {/* Delivery Estimation Box */}
+              {!selectedOrder.groupStatus.includes('Cancel') && !selectedOrder.groupStatus.includes('Refund') && (
+                <div style={{
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--color-green-very-light)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    🚚
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+                      Estimated Order Delivery
+                    </div>
+                    <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                      📅 1 October to 7 October
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                      Order confirmed after launching. Delivery within a week!
                     </div>
                   </div>
-                ))}
+                </div>
+              )}
+
+              {/* Items listing */}
+              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {((selectedOrder.items && selectedOrder.items.length > 0) ? selectedOrder.items : [{
+                  productId: 'default',
+                  productName: 'HomeKart Group Deal Item',
+                  productImage: '',
+                  quantity: 1,
+                  originalPrice: selectedOrder.total,
+                  groupPrice: selectedOrder.total,
+                  isGroupBuy: true
+                }]).map((item, idx) => {
+                  const matchedProd = products.find(p => p.id === item.productId || p.name.toLowerCase() === item.productName?.toLowerCase());
+                  const defaultProd = products[idx % products.length] || products[0];
+
+                  const imgSrc = (item.productImage && item.productImage.trim().length > 0 && !item.productImage.includes('photo-1542838132-92c53300491e'))
+                    ? item.productImage
+                    : (matchedProd?.imageUrl || defaultProd?.imageUrl || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=80');
+
+                  const prodName = (item.productName && !item.productName.includes('Bulk Group') && item.productName !== 'HomeKart Product')
+                    ? item.productName
+                    : (matchedProd?.name || defaultProd?.name || 'Homekart Product');
+
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <img 
+                        src={imgSrc} 
+                        alt={prodName} 
+                        style={{ width: '48px', height: '48px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--color-border)' }}
+                        onError={(e: any) => {
+                          e.target.onerror = null;
+                          e.target.src = defaultProd?.imageUrl || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=80';
+                        }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontWeight: 700, fontSize: '0.85rem' }}>{prodName}</p>
+                        <span style={{ fontSize: '0.75rem', color: '#5C6C62' }}>Qty: {item.quantity || 1} · {item.isGroupBuy ? 'Group Price' : 'Regular Price'}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Totals panel */}
@@ -351,7 +440,9 @@ export const Orders: React.FC = () => {
             >
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-dark)' }}>Order #{ord.id}</span>
+                  <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--color-dark)' }}>
+                    Order #{ord.id.startsWith('HK') ? ord.id : ('HK-' + ord.id.slice(0, 6).toUpperCase())}
+                  </span>
                   <span style={{ fontSize: '0.8rem', color: '#8C9B90' }}>· {new Date(ord.date).toLocaleDateString()}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -362,26 +453,75 @@ export const Orders: React.FC = () => {
 
               {/* Items listing */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
-                {ord.items.map((item, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                    <img 
-                      src={item.productImage} 
-                      alt={item.productName} 
-                      style={{ width: '40px', height: '40px', borderRadius: '4px', objectFit: 'cover' }}
-                    />
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{item.productName} (x{item.quantity})</span>
-                  </div>
-                ))}
+                {((ord.items && ord.items.length > 0) ? ord.items : [{
+                  productId: 'default',
+                  productName: 'HomeKart Group Deal Item',
+                  productImage: '',
+                  quantity: 1,
+                  originalPrice: ord.total,
+                  groupPrice: ord.total,
+                  isGroupBuy: true
+                }]).map((item, i) => {
+                  const matchedProd = products.find(p => p.id === item.productId || p.name.toLowerCase() === item.productName?.toLowerCase());
+                  const defaultProd = products[i % products.length] || products[0];
+
+                  const imgSrc = (item.productImage && item.productImage.trim().length > 0 && !item.productImage.includes('photo-1542838132-92c53300491e'))
+                    ? item.productImage
+                    : (matchedProd?.imageUrl || defaultProd?.imageUrl || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=80');
+
+                  const prodName = (item.productName && !item.productName.includes('Bulk Group') && item.productName !== 'HomeKart Product')
+                    ? item.productName
+                    : (matchedProd?.name || defaultProd?.name || 'Homekart Product');
+
+                  return (
+                    <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                      <img 
+                        src={imgSrc} 
+                        alt={prodName} 
+                        style={{ width: '44px', height: '44px', borderRadius: '6px', objectFit: 'cover', border: '1px solid var(--color-border)' }}
+                        onError={(e: any) => {
+                          e.target.onerror = null;
+                          e.target.src = defaultProd?.imageUrl || 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=500&auto=format&fit=crop&q=80';
+                        }}
+                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-dark)' }}>
+                        {prodName} (x{item.quantity || 1})
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Lower info */}
+              {/* Lower info & Actions */}
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#5C6C62' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <MapPin size={14} style={{ color: 'var(--color-primary)' }} />
                   <span>Pickup: {ord.dropPoint.name}</span>
                 </div>
-                <div style={{ fontWeight: 700 }}>
-                  Total Paid: <span style={{ color: 'var(--color-primary)', fontSize: '0.95rem' }}>₹{ord.total}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {ord.pickupStatus === 'Pending' && !ord.groupStatus.includes('Cancel') && !ord.groupStatus.includes('Refund') && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cancelOrder(ord.id);
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        backgroundColor: '#FEF2F2',
+                        color: '#DC2626',
+                        border: '1px solid #FCA5A5',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel Order
+                    </button>
+                  )}
+                  <div style={{ fontWeight: 700 }}>
+                    Total Paid: <span style={{ color: 'var(--color-primary)', fontSize: '0.95rem' }}>₹{ord.total}</span>
+                  </div>
                 </div>
               </div>
             </div>

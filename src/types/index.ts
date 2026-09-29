@@ -1,3 +1,12 @@
+export type UserRole = 'buyer' | 'supplier' | 'admin';
+
+export interface CategoryItem {
+  id: string;
+  name: string;
+  description?: string;
+  iconName?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -11,6 +20,13 @@ export interface Product {
   specifications: { [key: string]: string };
   availability: 'in-stock' | 'out-of-stock';
   expiresAt?: string;
+  // Real-world Multi-user & Supplier extensions
+  sellerRole?: 'admin' | 'supplier';
+  companyName?: string;
+  moq?: number; // Minimum Order Quantity / Target for group fill
+  approvalStatus?: 'approved' | 'pending' | 'rejected';
+  submittedBy?: string;
+  deliveryEstDate?: string; // Delivery window, e.g., "1 October to 7 October"
 }
 
 export type GroupStatusType =
@@ -40,6 +56,9 @@ export interface Group {
   deadline: string; // ISO date string
   dropPointId: string;
   dropPointName: string;
+  moq?: number;
+  companyName?: string;
+  adminPriceModified?: boolean;
 }
 
 export interface DropPoint {
@@ -72,6 +91,7 @@ export interface OrderItem {
   originalPrice: number;
   groupPrice: number;
   isGroupBuy: boolean;
+  companyName?: string;
 }
 
 export interface Order {
@@ -87,6 +107,13 @@ export interface Order {
   date: string; // ISO string
   groupId?: string; // empty if buy alone
   timeline: { title: string; date: string; completed: boolean }[];
+  deliveryEstDate?: string; // Estimated delivery date range: e.g. "1 October to 7 October"
+  refundDetails?: {
+    amount: number;
+    date: string;
+    reason: string;
+    transactionId: string;
+  };
 }
 
 export interface Notification {
@@ -97,16 +124,43 @@ export interface Notification {
   read: boolean;
 }
 
+export type KycStatus = 'none' | 'pending' | 'approved' | 'rejected';
+
+export interface SellerKycApplication {
+  id: string;
+  userId: string;
+  applicantName: string;
+  phone: string;
+  companyName: string;
+  gstin: string;
+  panNumber: string;
+  businessAddress: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  submittedAt: string;
+  status: KycStatus;
+  rejectionReason?: string;
+}
+
 export interface UserProfile {
+  id?: string;
   name: string;
   mobile: string;
+  email?: string;
   referralCode: string;
   referralEarnings: number;
   referralsCount: number;
   referralHistory: { name: string; date: string; amount: number }[];
+  role?: UserRole;
+  kycStatus?: KycStatus;
+  kycApplication?: SellerKycApplication;
+  interestedCategories?: string[];
 }
 
 export interface MonthlyBasketItem {
   productId: string;
   quantity: number;
 }
+
+

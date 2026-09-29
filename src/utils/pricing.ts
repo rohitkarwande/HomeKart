@@ -1,14 +1,39 @@
 import type { Product, Group } from '../types';
 
 /**
- * Calculates the dynamic group price based on current group fill count.
- * Decreases linearly from originalPrice to groupPrice as member count rises.
+ * Checks if the user is the first member (creator or 1st entrant) of a buying group.
+ */
+export const isFirstGroupMember = (groupId?: string, groups: Group[] = []): boolean => {
+  if (!groupId) return true; // Starting a brand new group
+  const group = groups.find(g => g.id === groupId);
+  if (!group) return true;
+  return group.currentMembers <= 1;
+};
+
+/**
+ * Calculates the extra 10% bonus discount per unit for the first member if quantity >= 5.
+ */
+export const calculateFirstUserBonus = (
+  product: Product,
+  isGroupBuy: boolean,
+  quantity: number,
+  isFirstUser: boolean
+): number => {
+  if (isGroupBuy && isFirstUser && quantity >= 5) {
+    return Math.round(product.groupPrice * 0.10); // 10% extra discount off group price
+  }
+  return 0;
+};
+
+/**
+ * Calculates the dynamic group price based on current group fill count and first-member bulk bonus.
  */
 export const calculateDynamicPrice = (
   product: Product,
   isGroupBuy: boolean,
   groupId?: string,
-  groups: Group[] = []
+  groups: Group[] = [],
+  quantity: number = 1
 ): number => {
   if (!isGroupBuy) return product.originalPrice;
 
@@ -24,11 +49,16 @@ export const calculateDynamicPrice = (
   }
 
   const maxDiscount = product.originalPrice - product.groupPrice;
-  if (target <= 0) return product.groupPrice;
-  
-  const discountRatio = Math.min(1, current / target);
+  const targetVal = target <= 0 ? 1 : target;
+  const discountRatio = Math.min(1, current / targetVal);
   const dynamicDiscount = Math.round(maxDiscount * discountRatio);
-  return product.originalPrice - dynamicDiscount;
+  let price = product.originalPrice - dynamicDiscount;
+
+  const isFirstUser = isFirstGroupMember(groupId, groups);
+  const bonus = calculateFirstUserBonus(product, isGroupBuy, quantity, isFirstUser);
+  price = Math.max(1, price - bonus);
+
+  return price;
 };
 
 /**

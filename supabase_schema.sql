@@ -36,6 +36,7 @@ create table public.profiles (
   full_name text,
   phone text unique,
   avatar_url text,
+  interested_categories text[] default '{}',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -274,12 +275,13 @@ create index idx_notifications_is_read on public.notifications(is_read);
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, full_name, phone, avatar_url)
+  insert into public.profiles (id, full_name, phone, avatar_url, interested_categories)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', ''),
     coalesce(new.phone, new.raw_user_meta_data->>'phone', ''),
-    coalesce(new.raw_user_meta_data->>'avatar_url', '')
+    coalesce(new.raw_user_meta_data->>'avatar_url', ''),
+    coalesce(array(select jsonb_array_elements_text(new.raw_user_meta_data->'interested_categories')), '{}')
   );
   return new;
 end;

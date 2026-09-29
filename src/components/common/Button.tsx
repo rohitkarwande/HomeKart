@@ -12,8 +12,30 @@ export const Button: React.FC<ButtonProps> = ({
   fullWidth = false,
   size = 'md',
   className = '',
-  ...props
+  style: customStyle,
+  ...restProps
 }) => {
+
+  const getBgColor = () => {
+    if (variant === 'primary') return 'var(--color-primary)';
+    if (variant === 'secondary') return '#FFFFFF';
+    if (variant === 'accent') return 'var(--color-accent)';
+    return '#F1F5F9';
+  };
+
+  const getColor = () => {
+    if (variant === 'primary') return '#FFFFFF';
+    if (variant === 'secondary') return 'var(--color-primary)';
+    if (variant === 'accent') return 'var(--color-dark)';
+    return 'var(--color-primary)';
+  };
+
+  const getBorder = () => {
+    if (variant === 'primary') return '1.5px solid var(--color-primary)';
+    if (variant === 'secondary') return '1.5px solid var(--color-primary)';
+    if (variant === 'accent') return '1.5px solid var(--color-accent)';
+    return '1.5px solid #CBD5E1';
+  };
 
   return (
     <button
@@ -21,23 +43,25 @@ export const Button: React.FC<ButtonProps> = ({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: '8px',
         fontFamily: 'var(--font-ui)',
-        fontWeight: 600,
-        borderRadius: 'var(--radius-sm)',
-        transition: 'all var(--transition-fast)',
-        cursor: props.disabled ? 'not-allowed' : 'pointer',
+        fontWeight: 700,
+        borderRadius: '10px',
+        transition: 'all 0.15s ease',
+        cursor: restProps.disabled ? 'not-allowed' : 'pointer',
         width: fullWidth ? '100%' : 'auto',
-        opacity: props.disabled ? 0.6 : 1,
-        // variant styles
-        backgroundColor: variant === 'primary' ? 'var(--color-primary)' : variant === 'secondary' ? 'var(--color-white)' : variant === 'accent' ? 'var(--color-accent)' : 'transparent',
-        color: variant === 'primary' ? 'var(--color-white)' : variant === 'secondary' ? 'var(--color-primary)' : variant === 'accent' ? 'var(--color-dark)' : 'var(--color-primary)',
-        border: variant === 'primary' ? '1px solid var(--color-primary)' : variant === 'secondary' ? '1px solid var(--color-primary)' : variant === 'accent' ? '1px solid var(--color-accent)' : 'none',
-        // size styles
-        padding: size === 'sm' ? '6px 12px' : size === 'lg' ? '14px 28px' : '10px 20px',
-        fontSize: size === 'sm' ? '0.875rem' : size === 'lg' ? '1.125rem' : '1rem',
+        opacity: restProps.disabled ? 0.6 : 1,
+        backgroundColor: getBgColor(),
+        color: getColor(),
+        border: getBorder(),
+        boxShadow: variant === 'text' ? 'none' : '0 2px 4px rgba(0,0,0,0.1)',
+        padding: size === 'sm' ? '8px 14px' : size === 'lg' ? '14px 28px' : '10px 20px',
+        fontSize: size === 'sm' ? '0.85rem' : size === 'lg' ? '1.05rem' : '0.95rem',
+        letterSpacing: '0.01em',
+        ...customStyle
       }}
       className={`hk-btn ${className}`}
-      {...props}
+      {...restProps}
     >
       {children}
     </button>

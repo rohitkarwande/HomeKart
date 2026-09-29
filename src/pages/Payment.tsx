@@ -10,15 +10,19 @@ export const Payment: React.FC = () => {
   const upiApp = pageParams?.upiApp || 'gpay';
 
   useEffect(() => {
-    // If cart is empty, redirect to shop
+    let isCancelled = false;
+
+    // Save initial cart items snapshot so cart changes don't cancel processing
     if (cart.length === 0) {
       const timer = setTimeout(() => {
-        setPage('shop');
+        if (!isCancelled) setPage('shop');
       }, 1000);
       return () => clearTimeout(timer);
     }
 
     const timer = setTimeout(async () => {
+      if (isCancelled) return;
+
       try {
         const orderMethod = paymentMethod === 'upi' 
           ? `UPI (${upiApp.toUpperCase()})` 
@@ -26,19 +30,22 @@ export const Payment: React.FC = () => {
           
         const newOrder = await placeOrder(orderMethod);
         
-        if (newOrder) {
+        if (newOrder && !isCancelled) {
           setPage('orderSuccess', { orderId: newOrder.id });
-        } else {
+        } else if (!isCancelled) {
           setError('Failed to create order. Please try again.');
         }
       } catch (err: any) {
         console.error('Payment processing error:', err);
-        setError('An unexpected error occurred during payment.');
+        if (!isCancelled) setError('An unexpected error occurred during payment.');
       }
-    }, 2500);
+    }, 2200);
 
-    return () => clearTimeout(timer);
-  }, [cart, paymentMethod, upiApp]);
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, []); // Run ONLY once on mount
 
   if (cart.length === 0 && !error) {
     return (

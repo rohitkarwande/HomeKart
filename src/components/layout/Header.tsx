@@ -9,7 +9,10 @@ import {
   Users,
   ClipboardList,
   Bell,
-  ShoppingBasket
+  ShoppingBasket,
+  ShieldCheck,
+  Factory,
+  ChevronDown
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -22,7 +25,8 @@ export const Header: React.FC = () => {
     setSearchQuery,
     notifications,
     user,
-    products
+    products,
+    userRole
   } = useHomekart();
 
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -56,7 +60,6 @@ export const Header: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-
   // Total cart items count
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -69,11 +72,22 @@ export const Header: React.FC = () => {
     setPage('shop');
   };
 
-  const navItems = [
-    { id: 'shop', label: 'Shop', icon: ShoppingBasket },
-    { id: 'groups', label: 'Groups', icon: Users },
-    { id: 'orders', label: 'Orders', icon: ClipboardList },
-    { id: 'leader', label: 'Leaders', icon: User },
+  const navItems = userRole === 'admin' ? [
+    { id: 'admin', label: '👑 Admin Control Center', icon: ShieldCheck },
+    { id: 'shop', label: '🛍️ Shop Market', icon: ShoppingBasket },
+    { id: 'groups', label: '👥 Group Buying', icon: Users },
+    { id: 'orders', label: '📦 Orders', icon: ClipboardList }
+  ] : userRole === 'supplier' ? [
+    { id: 'supplier', label: '🏭 Supplier Portal', icon: Factory },
+    { id: 'shop', label: '🛍️ Shop Market', icon: ShoppingBasket },
+    { id: 'groups', label: '👥 Group Buying', icon: Users },
+    { id: 'orders', label: '📦 Orders', icon: ClipboardList }
+  ] : [
+    { id: 'shop', label: '🛍️ Shop Market', icon: ShoppingBasket },
+    { id: 'groups', label: '👥 Community Groups', icon: Users },
+    { id: 'orders', label: '📦 My Orders', icon: ClipboardList },
+    { id: 'sellerKyc', label: user?.kycStatus === 'pending' ? '⏳ KYC Pending' : '💼 Become a Seller', icon: Factory },
+    { id: 'leader', label: '🏆 Leaders', icon: User }
   ];
 
   return (
@@ -82,50 +96,131 @@ export const Header: React.FC = () => {
       top: 0,
       zIndex: 100,
       backgroundColor: '#FFFFFF',
-      borderBottom: '1px solid var(--color-border)',
-      boxShadow: 'var(--shadow-sm)'
+      boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
     }}>
-      {/* Upper bar: Logo, Search, Location, Cart, Profile */}
+      {/* 1. TOP UTILITY BAR */}
+      <div style={{
+        backgroundColor: '#0F172A',
+        color: '#FFFFFF',
+        padding: '5px 0',
+        fontSize: '0.78rem'
+      }}>
+        <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#94A3B8' }}>
+            <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Account Role:
+              <strong style={{ color: 'var(--color-accent)', fontWeight: 800, marginLeft: '4px' }}>
+                {userRole === 'admin'
+                  ? '👑 System Administrator'
+                  : userRole === 'supplier'
+                  ? '🏭 Verified Seller'
+                  : '🛒 Buyer Account'}
+              </strong>
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {userRole === 'buyer' && (
+              <button
+                onClick={() => setPage(user ? 'sellerKyc' : 'auth')}
+                style={{
+                  padding: '3px 12px',
+                  borderRadius: '12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  backgroundColor: 'var(--color-accent)',
+                  color: 'var(--color-dark)',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                {user?.kycStatus === 'pending' ? '⏳ KYC Application Under Review' : '💼 Apply for Seller Verification'}
+              </button>
+            )}
+            {userRole === 'supplier' && (
+              <button
+                onClick={() => setPage('supplier')}
+                style={{
+                  padding: '3px 12px',
+                  borderRadius: '12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  backgroundColor: '#0284C7',
+                  color: '#FFFFFF',
+                  border: 'none'
+                }}
+              >
+                🏭 Open Supplier Portal
+              </button>
+            )}
+            {userRole === 'admin' && (
+              <button
+                onClick={() => setPage('admin')}
+                style={{
+                  padding: '3px 12px',
+                  borderRadius: '12px',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  backgroundColor: '#7C3AED',
+                  color: '#FFFFFF',
+                  border: 'none'
+                }}
+              >
+                👑 Admin Control Center
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. MAIN HEADER BAR (Brand Logo, Drop Point, Search, Cart, Auth) */}
       <div className="container" style={{
-        height: '80px',
+        height: '70px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: '20px'
       }}>
-        {/* Logo and Mobile Toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div onClick={() => setPage('home')}>
+        {/* Logo and Drop Point Picker */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div onClick={() => setPage('home')} style={{ cursor: 'pointer' }}>
             <Logo size="md" />
           </div>
-        </div>
 
-        {/* Drop Point Selector */}
-        <div 
-          onClick={() => setPage('dropPoints')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            cursor: 'pointer',
-            padding: '6px 12px',
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'var(--color-green-very-light)',
-            border: '1px solid rgba(24, 83, 56, 0.1)',
-            fontSize: '0.85rem',
-            color: 'var(--color-primary)',
-            fontWeight: 600,
-            maxWidth: '220px',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}
-          title="Choose pickup drop point"
-        >
-          <MapPin size={16} style={{ flexShrink: 0, color: 'var(--color-accent)' }} />
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {selectedDropPoint ? selectedDropPoint.name : 'Choose Drop Point'}
-          </span>
+          {/* Drop Point Selector Card */}
+          <div 
+            onClick={() => setPage('dropPoints')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              padding: '8px 12px',
+              borderRadius: '10px',
+              backgroundColor: '#F0FDF4',
+              border: '1.5px solid #BBF7D0',
+              fontSize: '0.82rem',
+              color: 'var(--color-primary)',
+              fontWeight: 700,
+              maxWidth: '200px',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              transition: 'all 0.15s ease'
+            }}
+            title="Choose pickup drop point"
+          >
+            <MapPin size={16} style={{ flexShrink: 0, color: 'var(--color-primary)' }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {selectedDropPoint ? selectedDropPoint.name.split(' ')[0] + ' Point' : 'Select Point'}
+            </span>
+            <ChevronDown size={14} style={{ opacity: 0.6 }} />
+          </div>
         </div>
 
         {/* Search Bar (Desktop) */}
@@ -133,7 +228,7 @@ export const Header: React.FC = () => {
           onSubmit={handleSearchSubmit}
           style={{
             flex: 1,
-            maxWidth: '460px',
+            maxWidth: '520px',
             position: 'relative',
             display: 'flex'
           }}
@@ -142,22 +237,28 @@ export const Header: React.FC = () => {
         >
           <input
             type="text"
-            placeholder="Search groceries, gadgets, home items..."
+            placeholder="Search vegetables, electronics, clothes, groceries..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               width: '100%',
-              padding: '10px 84px 10px 42px',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--color-border)',
-              backgroundColor: 'var(--color-off-white)',
-              fontSize: '0.9rem',
-              color: 'var(--color-dark)',
+              padding: '10px 88px 10px 42px',
+              borderRadius: '24px',
+              border: '1.5px solid #CBD5E1',
+              backgroundColor: '#F8FAFC',
+              fontSize: '0.88rem',
+              color: '#0F172A',
               outline: 'none',
-              transition: 'border var(--transition-fast)'
+              transition: 'all 0.15s ease'
             }}
-            onFocus={(e) => e.target.style.borderColor = 'var(--color-primary)'}
-            onBlur={(e) => e.target.style.borderColor = 'var(--color-border)'}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--color-primary)';
+              e.target.style.backgroundColor = '#FFFFFF';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#CBD5E1';
+              e.target.style.backgroundColor = '#F8FAFC';
+            }}
           />
           <Search 
             size={18} 
@@ -166,7 +267,7 @@ export const Header: React.FC = () => {
               left: '14px',
               top: '50%',
               transform: 'translateY(-50%)',
-              color: '#8C9B90'
+              color: '#64748B'
             }} 
           />
           {searchQuery && (
@@ -183,9 +284,9 @@ export const Header: React.FC = () => {
                 transform: 'translateY(-50%)',
                 background: 'none',
                 border: 'none',
-                color: '#8C9B90',
+                color: '#64748B',
                 cursor: 'pointer',
-                fontSize: '1rem',
+                fontSize: '0.9rem',
                 fontWeight: 'bold',
                 padding: '4px',
                 zIndex: 10
@@ -201,12 +302,14 @@ export const Header: React.FC = () => {
               right: '4px',
               top: '4px',
               bottom: '4px',
-              padding: '0 12px',
+              padding: '0 16px',
               backgroundColor: 'var(--color-primary)',
               color: '#FFFFFF',
-              borderRadius: '6px',
+              borderRadius: '20px',
               fontSize: '0.8rem',
-              fontWeight: 600
+              fontWeight: 800,
+              border: 'none',
+              cursor: 'pointer'
             }}
           >
             Find
@@ -218,9 +321,9 @@ export const Header: React.FC = () => {
               left: 0,
               right: 0,
               backgroundColor: '#FFFFFF',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
-              boxShadow: 'var(--shadow-md)',
+              border: '1.5px solid var(--color-primary)',
+              borderRadius: '12px',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
               zIndex: 250,
               marginTop: '6px',
               maxHeight: '300px',
@@ -237,87 +340,58 @@ export const Header: React.FC = () => {
                     setSearchQuery('');
                   }}
                   style={{
-                    padding: '10px 16px',
+                    padding: '12px 16px',
                     cursor: 'pointer',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    borderBottom: '1px solid var(--color-off-white)',
-                    fontSize: '0.85rem',
+                    borderBottom: '1px solid #F1F5F9',
+                    fontSize: '0.88rem',
                     textAlign: 'left'
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-green-very-light)'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F0FDF4'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--color-dark)' }}>{s.name}</span>
-                    <span style={{ fontSize: '0.7rem', color: '#8C9B90', textTransform: 'uppercase' }}>{s.category}</span>
+                    <span style={{ fontWeight: 700, color: '#1E293B' }}>{s.name}</span>
+                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>{s.category}</span>
                   </div>
-                  <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>₹{s.groupPrice}</span>
+                  <span style={{ fontWeight: 800, color: 'var(--color-primary)' }}>₹{s.groupPrice}</span>
                 </div>
               ))}
             </div>
           )}
         </form>
 
-        {/* Desktop Navigation Links */}
-        <nav className="header-nav-desktop" style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '24px'
-        }}>
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activePage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setPage(item.id)}
-                style={{
-                  fontFamily: 'var(--font-ui)',
-                  fontWeight: 600,
-                  fontSize: '0.95rem',
-                  color: isActive ? 'var(--color-primary)' : 'var(--color-dark-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  position: 'relative',
-                  padding: '8px 0',
-                  borderBottom: isActive ? '2px solid var(--color-primary)' : '2px solid transparent',
-                  borderRadius: 0,
-                  transition: 'color var(--transition-fast)'
-                }}
-              >
-                <Icon size={16} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Actions: Notifications, Cart, Profile */}
+        {/* Right Actions: Notifications, Cart, Auth Buttons */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '16px'
+          gap: '12px'
         }}>
-          {/* Notification Bell */}
+          {/* Notification Bell Icon Container */}
           <button 
             onClick={() => setPage('notifications')}
             style={{
               position: 'relative',
-              padding: '8px',
-              borderRadius: '50%',
-              backgroundColor: activePage === 'notifications' ? 'var(--color-green-light)' : 'transparent',
-              color: 'var(--color-primary)'
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              border: '1.5px solid #E2E8F0',
+              backgroundColor: activePage === 'notifications' ? '#F0FDF4' : '#FFFFFF',
+              color: 'var(--color-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer'
             }}
           >
-            <Bell size={20} />
+            <Bell size={18} />
             {unreadCount > 0 && (
               <span style={{
                 position: 'absolute',
-                top: '4px',
-                right: '4px',
+                top: '6px',
+                right: '6px',
                 width: '8px',
                 height: '8px',
                 backgroundColor: 'var(--color-error)',
@@ -326,75 +400,162 @@ export const Header: React.FC = () => {
             )}
           </button>
 
-          {/* Cart Icon */}
+          {/* Cart Button Card */}
           <button 
             onClick={() => setPage('cart')}
             style={{
               position: 'relative',
-              padding: '8px',
-              borderRadius: '50%',
-              backgroundColor: activePage === 'cart' ? 'var(--color-green-light)' : 'transparent',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              border: '1.5px solid var(--color-primary)',
+              backgroundColor: 'var(--color-green-light)',
               color: 'var(--color-primary)',
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 800,
+              fontSize: '0.85rem',
+              cursor: 'pointer'
             }}
           >
-            <ShoppingBag size={20} />
+            <ShoppingBag size={18} />
+            <span>Cart</span>
             {cartItemsCount > 0 && (
               <span style={{
-                position: 'absolute',
-                top: '-2px',
-                right: '-2px',
-                backgroundColor: 'var(--color-accent)',
-                color: 'var(--color-dark)',
-                fontSize: '0.7rem',
-                fontWeight: 'bold',
-                padding: '2px 6px',
+                backgroundColor: 'var(--color-primary)',
+                color: '#FFFFFF',
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                padding: '2px 7px',
                 borderRadius: '10px',
-                minWidth: '18px',
-                textAlign: 'center',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                marginLeft: '2px'
               }}>
                 {cartItemsCount}
               </span>
             )}
           </button>
 
-          {/* User Profile / Login Link */}
-          <button 
-            onClick={() => setPage(user ? 'profile' : 'auth')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 12px',
-              borderRadius: '20px',
-              border: '1px solid var(--color-border)',
-              backgroundColor: activePage === 'profile' ? 'var(--color-green-light)' : 'var(--color-white)',
-              color: 'var(--color-primary)'
-            }}
-          >
-            <User size={18} />
-            <span style={{
-              fontSize: '0.9rem',
-              fontWeight: 600,
-              maxWidth: '100px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }} className="header-username">
-              {user ? user.name.split(' ')[0] : 'Login'}
-            </span>
-          </button>
+          {/* User Profile / Auth Button Cards */}
+          {user ? (
+            <button 
+              onClick={() => setPage('profile')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                borderRadius: '10px',
+                border: '1.5px solid #CBD5E1',
+                backgroundColor: activePage === 'profile' ? '#F1F5F9' : '#FFFFFF',
+                color: '#1E293B',
+                fontWeight: 800,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+              }}
+            >
+              <User size={18} style={{ color: 'var(--color-primary)' }} />
+              <span style={{
+                maxWidth: '100px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }} className="header-username">
+                {user.name.split(' ')[0]}
+              </span>
+            </button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => setPage('auth')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  borderRadius: '10px',
+                  border: '1.5px solid var(--color-primary)',
+                  backgroundColor: '#FFFFFF',
+                  color: 'var(--color-primary)',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                }}
+              >
+                <User size={16} /> Sign In
+              </button>
+
+              <button
+                onClick={() => setPage('auth')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 16px',
+                  borderRadius: '10px',
+                  border: '1.5px solid var(--color-primary)',
+                  backgroundColor: 'var(--color-primary)',
+                  color: '#FFFFFF',
+                  fontWeight: 800,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                <User size={16} /> Register
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* 3. SECONDARY DEDICATED NAVIGATION BAR (Page Tabs Bar) */}
+      <nav style={{
+        backgroundColor: '#F8FAFC',
+        borderTop: '1px solid #E2E8F0',
+        borderBottom: '1px solid #E2E8F0',
+        padding: '6px 0'
+      }}>
+        <div className="container" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          overflowX: 'auto',
+          paddingBottom: '2px'
+        }}>
+          {navItems.map(item => {
+            const isActive = activePage === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setPage(item.id)}
+                style={{
+                  fontFamily: 'var(--font-ui)',
+                  fontWeight: 800,
+                  fontSize: '0.84rem',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  border: isActive ? '1.5px solid var(--color-primary)' : '1px solid #CBD5E1',
+                  backgroundColor: isActive ? 'var(--color-primary)' : '#FFFFFF',
+                  color: isActive ? '#FFFFFF' : '#475569',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.15s ease',
+                  boxShadow: isActive ? '0 2px 4px rgba(24,83,56,0.2)' : 'none'
+                }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       {/* CSS stylesheet helper styles for header responsiveness */}
       <style>{`
         @media (max-width: 768px) {
-          .header-search-desktop,
-          .header-nav-desktop,
-          .header-username {
+          .header-search-desktop {
             display: none !important;
           }
         }

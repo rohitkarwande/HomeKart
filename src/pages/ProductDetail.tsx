@@ -13,7 +13,7 @@ import {
   Truck,
   Clock
 } from 'lucide-react';
-import { getCountdownText, formatExpiryTime } from '../utils/pricing';
+import { getCountdownText, formatExpiryTime, calculateFirstUserBonus } from '../utils/pricing';
 
 const getGalleryImages = (mainUrl: string): string[] => {
   if (mainUrl.includes('unsplash.com')) {
@@ -135,7 +135,6 @@ export const ProductDetail: React.FC = () => {
   const activeProductGroups = isExpired ? [] : groups.filter(g => g.productId === product.id && (g.status === 'Open' || g.status === 'Almost Full'));
 
   const savings = (product.originalPrice - product.groupPrice) * quantity;
-  const savingsPct = Math.round(((product.originalPrice - product.groupPrice) / product.originalPrice) * 100);
 
   const handleBuyAlone = () => {
     if (isExpired) return;
@@ -166,7 +165,7 @@ export const ProductDetail: React.FC = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }} className="animate-fade-in">
       
       {/* Back link */}
-      <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button 
           onClick={() => setPage('shop')}
           style={{
@@ -180,7 +179,29 @@ export const ProductDetail: React.FC = () => {
         >
           <ArrowLeft size={16} /> Back to Catalog
         </button>
+
+        {product.approvalStatus === 'pending' && (
+          <Badge status="Pending Admin Approval" />
+        )}
       </div>
+
+      {/* Pending status alert banner if item is waiting for admin approval */}
+      {product.approvalStatus === 'pending' && (
+        <div style={{
+          backgroundColor: '#FFFBEB',
+          border: '1px solid #FCD34D',
+          borderRadius: '8px',
+          padding: '16px 20px',
+          color: '#92400E',
+          fontSize: '0.9rem',
+          fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <span>⏳ <strong>Pending Admin Approval:</strong> This seller listing is currently under review by Admin before appearing to public buyers in the market.</span>
+        </div>
+      )}
 
       {/* Main product layout */}
       <div style={{
@@ -256,10 +277,35 @@ export const ProductDetail: React.FC = () => {
         {/* Right Column: Pricing details, descriptions, buying actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
-            <Badge status={product.availability === 'in-stock' ? 'In Stock' : 'Out of Stock'} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+              <Badge status={product.availability === 'in-stock' ? 'In Stock' : 'Out of Stock'} />
+              <span style={{
+                backgroundColor: 'var(--color-green-very-light)',
+                color: 'var(--color-primary)',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                border: '1px solid rgba(24, 83, 56, 0.15)'
+              }}>
+                Seller: {product.companyName || 'HomeKart Direct'}
+              </span>
+              <span style={{
+                backgroundColor: 'rgba(230, 150, 0, 0.1)',
+                color: '#B45309',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontSize: '0.75rem',
+                fontWeight: 700
+              }}>
+                MOQ Target: {product.moq || 20} Units
+              </span>
+            </div>
+
             <h1 style={{ fontSize: '2.2rem', color: 'var(--color-dark)', marginTop: '8px', lineHeight: '1.25' }}>
               {product.name}
             </h1>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
               <span style={{
                 display: 'inline-flex',
@@ -278,6 +324,32 @@ export const ProductDetail: React.FC = () => {
                 ({product.reviewsCount} customer reviews)
               </span>
             </div>
+
+            {/* Estimated Delivery Box */}
+            <div style={{
+              marginTop: '14px',
+              backgroundColor: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}>
+              <Truck size={22} style={{ color: 'var(--color-primary)', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+                  Estimated Order Delivery
+                </div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-primary)' }}>
+                  📅 {product.deliveryEstDate || '1 October to 7 October'}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B' }}>
+                  Delivering within a week after group deal launch.
+                </div>
+              </div>
+            </div>
+
             {product.expiresAt && (
               <div style={{ 
                 display: 'flex', 
@@ -299,44 +371,90 @@ export const ProductDetail: React.FC = () => {
             )}
           </div>
 
-          {/* Pricing Comparison Panel - Crucial spec highlight */}
-          <div style={{
-            backgroundColor: 'var(--color-green-very-light)',
-            borderRadius: 'var(--radius-md)',
-            border: '1px solid rgba(24, 83, 56, 0.1)',
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <div>
-                <span style={{ fontSize: '0.8rem', color: '#5C6C62', display: 'block', fontWeight: 600 }}>BUY ALONE PRICE</span>
-                <span style={{ fontSize: '1.4rem', textDecoration: 'line-through', color: 'var(--color-error)', fontWeight: 600 }}>₹{product.originalPrice}</span>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--color-primary)', fontWeight: 800, display: 'block' }}>GROUP PRICE UNLOCKED</span>
-                <span style={{ fontSize: '2.2rem', color: 'var(--color-primary)', fontWeight: 800, fontFamily: 'var(--font-display)', lineHeight: '1' }}>₹{product.groupPrice}</span>
-              </div>
-            </div>
+          {/* First Member Discount Incentive Banner */}
+          {(() => {
+            const firstBonusPerUnit = calculateFirstUserBonus(product, true, quantity, true);
+            const effectivePrice = product.groupPrice - firstBonusPerUnit;
+            const isEligible = quantity >= 5;
 
-            <div style={{
-              borderTop: '1px dashed var(--color-border)',
-              paddingTop: '12px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span style={{ color: 'var(--color-green-bright)', fontWeight: 700, fontSize: '0.95rem' }}>
-                SAVE ₹{product.originalPrice - product.groupPrice} per item ({savingsPct}% Off)
-              </span>
-              {quantity > 1 && (
-                <span style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: 600 }}>
-                  Total Savings: ₹{savings}
-                </span>
-              )}
-            </div>
-          </div>
+            return (
+              <div style={{
+                backgroundColor: isEligible ? '#ECFDF5' : '#EFF6FF',
+                border: isEligible ? '1px solid #10B981' : '1px solid #3B82F6',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: isEligible ? '#047857' : '#1D4ED8', fontSize: '0.9rem' }}>
+                  <span>👑 FIRST MEMBER BONUS DEAL:</span>
+                  <span style={{ fontSize: '0.75rem', backgroundColor: isEligible ? '#10B981' : '#3B82F6', color: '#FFFFFF', padding: '2px 8px', borderRadius: '12px' }}>
+                    MIN 5 QTY
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: isEligible ? '#065F46' : '#1E40AF', lineHeight: '1.4' }}>
+                  {isEligible ? (
+                    <>🎉 <strong>10% First Member Bonus Unlocked!</strong> You get an extra <strong>₹{firstBonusPerUnit} OFF</strong> per item (Effective Price: <strong>₹{effectivePrice}/unit</strong>).</>
+                  ) : (
+                    <>Add <strong>{5 - quantity} more item(s)</strong> (minimum 5 total) as the first group member to unlock an extra <strong>10% Bonus Discount</strong>!</>
+                  )}
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* Pricing Comparison Panel - Crucial spec highlight */}
+          {(() => {
+            const firstBonusPerUnit = calculateFirstUserBonus(product, true, quantity, true);
+            const effectiveGroupPrice = product.groupPrice - firstBonusPerUnit;
+            const itemSavings = product.originalPrice - effectiveGroupPrice;
+            const totalSavingsCombined = itemSavings * quantity;
+
+            return (
+              <div style={{
+                backgroundColor: 'var(--color-green-very-light)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid rgba(24, 83, 56, 0.1)',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <div>
+                    <span style={{ fontSize: '0.8rem', color: '#5C6C62', display: 'block', fontWeight: 700 }}>OTHER APPS PRICE</span>
+                    <span style={{ fontSize: '1.4rem', textDecoration: 'line-through', color: 'var(--color-error)', fontWeight: 600 }}>₹{product.originalPrice}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--color-primary)', fontWeight: 800, display: 'block' }}>
+                      {quantity >= 5 ? 'OUR APP (20% LOWER + 10% FIRST MEMBER BONUS)' : 'OUR APP PRICE (20% LOWER)'}
+                    </span>
+                    <span style={{ fontSize: '2.2rem', color: 'var(--color-primary)', fontWeight: 800, fontFamily: 'var(--font-display)', lineHeight: '1' }}>
+                      ₹{effectiveGroupPrice}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{
+                  borderTop: '1px dashed var(--color-border)',
+                  paddingTop: '12px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ color: 'var(--color-green-bright)', fontWeight: 700, fontSize: '0.95rem' }}>
+                    SAVE ₹{itemSavings} per item ({Math.round((itemSavings / product.originalPrice) * 100)}% Off)
+                  </span>
+                  {quantity > 1 && (
+                    <span style={{ fontSize: '0.85rem', color: 'var(--color-primary)', fontWeight: 600 }}>
+                      Total Savings: ₹{totalSavingsCombined}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Quantity Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -358,6 +476,11 @@ export const ProductDetail: React.FC = () => {
                 style={{ padding: '6px 12px', borderLeft: '1px solid var(--color-border)', fontWeight: 'bold' }}
               >+</button>
             </div>
+            {quantity < 5 && (
+              <span style={{ fontSize: '0.8rem', color: '#1D4ED8', fontWeight: 600 }}>
+                💡 Select 5+ qty for extra 10% discount
+              </span>
+            )}
           </div>
 
           {/* Active Groups lists to Join */}

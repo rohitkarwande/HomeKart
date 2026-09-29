@@ -1,6 +1,6 @@
 import React from 'react';
 import { useHomekart } from '../store/homekartStore';
-import { calculateDynamicPrice } from '../utils/pricing';
+import { calculateDynamicPrice, isFirstGroupMember, calculateFirstUserBonus } from '../utils/pricing';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { 
@@ -31,12 +31,18 @@ export const Cart: React.FC = () => {
   };
 
   // Calculations
-  const subtotal = cart.reduce((sum, item) => sum + (item.product.originalPrice * item.quantity), 0);
-  const total = cart.reduce((sum, item) => {
-    const price = calculateDynamicPrice(item.product, item.isGroupBuy, item.groupId, groups);
-    return sum + (price * item.quantity);
+  const itemSubtotal = cart.reduce((sum, item) => {
+    const basePrice = item.isGroupBuy ? item.product.groupPrice : item.product.originalPrice;
+    return sum + (basePrice * item.quantity);
   }, 0);
-  const savings = subtotal - total;
+
+  const firstMemberBonusTotal = cart.reduce((sum, item) => {
+    const isFirstUser = isFirstGroupMember(item.groupId, groups);
+    const bonusPerUnit = calculateFirstUserBonus(item.product, item.isGroupBuy, item.quantity, isFirstUser);
+    return sum + (bonusPerUnit * item.quantity);
+  }, 0);
+
+  const total = Math.max(0, itemSubtotal - firstMemberBonusTotal);
   const applicableCharges = 0; // Free Pickup
 
   if (isLoading) {
@@ -119,10 +125,12 @@ export const Cart: React.FC = () => {
         {/* Left Column: Cart items */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {cart.map(item => {
-            const dynamicUnitPrice = calculateDynamicPrice(item.product, item.isGroupBuy, item.groupId, groups);
+            const dynamicUnitPrice = calculateDynamicPrice(item.product, item.isGroupBuy, item.groupId, groups, item.quantity);
             const itemOriginalTotal = item.product.originalPrice * item.quantity;
             const itemTotal = dynamicUnitPrice * item.quantity;
             const itemSavings = itemOriginalTotal - itemTotal;
+            const isFirstUser = isFirstGroupMember(item.groupId, groups);
+            const hasFirstMemberBonus = item.isGroupBuy && isFirstUser && item.quantity >= 5;
 
             return (
               <div 
@@ -188,9 +196,21 @@ export const Cart: React.FC = () => {
                       >+</button>
                     </div>
 
-                    {/* Group Badge */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {/* Group Badge & First Member Bonus */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                       <Badge status={item.isGroupBuy ? 'GROUP BUY' : 'BUY ALONE'} />
+                      {hasFirstMemberBonus && (
+                        <span style={{
+                          fontSize: '0.72rem',
+                          backgroundColor: '#10B981',
+                          color: '#FFFFFF',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          fontWeight: 700
+                        }}>
+                          👑 10% 1st Member Bonus (Min 5 Qty)
+                        </span>
+                      )}
                       {item.isGroupBuy && (
                         <span style={{ fontSize: '0.75rem', color: 'var(--color-green-bright)', fontWeight: 700 }}>
                           Save ₹{itemSavings}
@@ -198,6 +218,12 @@ export const Cart: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {item.isGroupBuy && isFirstUser && item.quantity < 5 && (
+                    <div style={{ fontSize: '0.78rem', color: '#1D4ED8', backgroundColor: '#EFF6FF', padding: '6px 10px', borderRadius: '4px', marginTop: '4px', fontWeight: 600 }}>
+                      💡 Tip: Increase quantity to 5 to unlock an extra 10% First Member Bonus Discount! ({5 - item.quantity} more needed)
+                    </div>
+                  )}
                 </div>
 
                 {/* Price and Delete Panel */}
@@ -294,16 +320,16 @@ export const Cart: React.FC = () => {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: '#5C6C62' }}>
-                <span>Subtotal (Items Normal Price)</span>
-                <span>₹{subtotal}</span>
+                <span>Subtotal</span>
+                <span>₹{itemSubtotal}</span>
               </div>
               
-              {savings > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: 'var(--color-primary)', fontWeight: 600 }}>
+              {firstMemberBonusTotal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.95rem', color: '#10B981', fontWeight: 700 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Percent size={14} /> Group Savings Discount
+                    <Percent size={14} /> 👑 First Member Bonus (10% Extra Off)
                   </span>
-                  <span>-₹{savings}</span>
+                  <span>-₹{firstMemberBonusTotal}</span>
                 </div>
               )}
               

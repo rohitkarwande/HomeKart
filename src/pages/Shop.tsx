@@ -14,7 +14,9 @@ export const Shop: React.FC = () => {
     selectedCategory,
     setSelectedCategory,
     setPage,
-    addToCart
+    addToCart,
+    categories: storeCategories,
+    userRole
   } = useHomekart();
 
   // Shop states
@@ -25,13 +27,18 @@ export const Shop: React.FC = () => {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
+  // Dynamic categories from store
+  const categories = useMemo(() => {
+    return storeCategories && storeCategories.length > 0 ? storeCategories : ['All', 'Salon Products', 'Tech Products', 'Staples'];
+  }, [storeCategories]);
+
   // Update suggestions when query changes
   useEffect(() => {
     if (searchQuery.trim().length > 1) {
       const q = searchQuery.toLowerCase();
       const filtered = products.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        p.category.toLowerCase().includes(q)
+        (userRole !== 'buyer' || p.approvalStatus === 'approved') &&
+        (p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))
       ).slice(0, 5);
       setSuggestions(filtered);
       setShowSuggestions(true);
@@ -39,7 +46,7 @@ export const Shop: React.FC = () => {
       setSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [searchQuery, products]);
+  }, [searchQuery, products, userRole]);
 
   // Click outside to dismiss suggestions
   useEffect(() => {
@@ -51,12 +58,6 @@ export const Shop: React.FC = () => {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
-
-  // Categories list derived from seed products
-  const categories = useMemo(() => {
-    const list = new Set(products.map(p => p.category));
-    return ['All', ...Array.from(list)];
-  }, [products]);
 
   // Compute number of active groups per product
   const productGroupCounts = useMemo(() => {
@@ -75,8 +76,16 @@ export const Shop: React.FC = () => {
 
   // Filtered and sorted products
   const filteredProducts = useMemo(() => {
-    // Exclude expired product deals
-    let result = products.filter(p => !p.expiresAt || new Date() < new Date(p.expiresAt));
+    // Filter active products
+    let result = products.filter(p => {
+      const notExpired = !p.expiresAt || new Date() < new Date(p.expiresAt);
+      if (!notExpired) return false;
+      // For Buyers, only show approved products or seed products (where approvalStatus is undefined or 'approved')
+      if (userRole === 'buyer') {
+        return p.approvalStatus === 'approved' || !p.approvalStatus;
+      }
+      return true;
+    });
 
     // Search query filter
     if (searchQuery) {
@@ -84,7 +93,8 @@ export const Shop: React.FC = () => {
       result = result.filter(p => 
         p.name.toLowerCase().includes(q) || 
         p.description.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
+        p.category.toLowerCase().includes(q) ||
+        (p.companyName && p.companyName.toLowerCase().includes(q))
       );
     }
 
@@ -108,7 +118,7 @@ export const Shop: React.FC = () => {
     }
 
     return result;
-  }, [products, searchQuery, selectedCategory, showGroupsOnly, sortOption, productGroupCounts]);
+  }, [products, searchQuery, selectedCategory, showGroupsOnly, sortOption, productGroupCounts, userRole]);
 
   const handleProductClick = (productId: string) => {
     setPage('product', { id: productId });
@@ -343,7 +353,6 @@ export const Shop: React.FC = () => {
           gap: '24px'
         }}>
           {filteredProducts.map(product => {
-            const savings = product.originalPrice - product.groupPrice;
             const activeGroupInfo = productGroupCounts[product.id];
             const activeGroup = groups.find(g => g.productId === product.id && (g.status === 'Open' || g.status === 'Almost Full'));
 
@@ -434,19 +443,31 @@ export const Shop: React.FC = () => {
                     border: '1px solid rgba(24, 83, 56, 0.05)'
                   }}>
                     <div>
-                      <span style={{ fontSize: '0.7rem', color: '#5C6C62', display: 'block' }}>Normal Price</span>
-                      <span style={{ textDecoration: 'line-through', color: 'var(--color-error)', fontSize: '0.85rem', fontWeight: 500 }}>₹{product.originalPrice}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#5C6C62', display: 'block', fontWeight: 600 }}>Other Apps</span>
+                      <span style={{ textDecoration: 'line-through', color: 'var(--color-error)', fontSize: '0.85rem', fontWeight: 600 }}>₹{product.originalPrice}</span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-primary)', fontWeight: 700, display: 'block' }}>Group Price</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-primary)', fontWeight: 800, display: 'block' }}>Our App</span>
                       <span style={{ color: 'var(--color-primary)', fontWeight: 800, fontSize: '1.2rem' }}>₹{product.groupPrice}</span>
                     </div>
                   </div>
 
-                  {/* Savings details */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
-                    <span style={{ color: 'var(--color-green-bright)', fontWeight: 700 }}>
-                      SAVE ₹{savings} ({(Math.round((savings / product.originalPrice) * 100))}% OFF)
+                  {/* Other App Comparison Badge */}
+                  <div style={{
+                    backgroundColor: '#FEF3C7',
+                    border: '1px solid #F59E0B',
+                    color: '#92400E',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}>
+                    <span>Other Apps: <span style={{ textDecoration: 'line-through' }}>₹{product.originalPrice}</span></span>
+                    <span style={{ backgroundColor: '#10B981', color: '#FFFFFF', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800 }}>
+                      Our App 20% Lower
                     </span>
                   </div>
 

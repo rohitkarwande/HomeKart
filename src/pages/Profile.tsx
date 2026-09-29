@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export const Profile: React.FC = () => {
-  const { user, logout, setPage, orders, leaderProfile } = useHomekart();
+  const { user, logout, setPage, orders, leaderProfile, userRole } = useHomekart();
   const [activeSubTab, setActiveSubTab] = useState<'payments' | 'help' | 'about' | null>(null);
 
   if (!user) {
@@ -299,12 +299,142 @@ export const Profile: React.FC = () => {
           <span style={{ fontSize: '0.85rem', color: '#5C6C62' }}>
             +91 {user.mobile}
           </span>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-            <Badge status="MEMBER" />
+          <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{
+              fontSize: '0.75rem',
+              fontWeight: 800,
+              padding: '4px 12px',
+              borderRadius: '12px',
+              backgroundColor: userRole === 'admin' ? '#7C3AED' : userRole === 'supplier' ? '#0284C7' : 'var(--color-primary)',
+              color: '#FFFFFF',
+              textTransform: 'uppercase'
+            }}>
+              {userRole === 'admin' ? '👑 System Administrator' : userRole === 'supplier' ? '🏭 Verified Seller / Supplier' : '🛒 Buyer Account'}
+            </span>
+            {userRole === 'supplier' && (
+              <span style={{
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                padding: '4px 12px',
+                borderRadius: '12px',
+                backgroundColor: 'var(--color-green-very-light)',
+                color: 'var(--color-primary)',
+                border: '1px solid var(--color-primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}>
+                ✓ Verified Seller
+              </span>
+            )}
             {leaderProfile.status === 'Active' && <Badge status="LEADER" />}
           </div>
         </div>
       </div>
+
+      {/* Interested Categories display */}
+      <div style={{
+        backgroundColor: '#FFFFFF',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--color-border)',
+        padding: '20px 24px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        boxShadow: 'var(--shadow-sm)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--color-dark)', margin: 0 }}>
+            🎯 Your Interested Categories
+          </h3>
+          <button 
+            onClick={() => setPage('home')} 
+            style={{ fontSize: '0.8rem', color: 'var(--color-primary)', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer' }}
+          >
+            Edit Interests on Homepage →
+          </button>
+        </div>
+        <p style={{ fontSize: '0.8rem', color: '#64748B', margin: 0 }}>
+          Your homepage prioritizes products matching these categories in front:
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '2px' }}>
+          {(user.interestedCategories && user.interestedCategories.length > 0 ? user.interestedCategories : ['Vegetables & Fruits', 'Tech Products']).map((cat, i) => (
+            <span
+              key={i}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                backgroundColor: 'var(--color-green-light)',
+                color: 'var(--color-primary)',
+                fontSize: '0.82rem',
+                fontWeight: 700
+              }}
+            >
+              ✓ {cat}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Seller KYC CTA Banner for Buyers */}
+      {userRole === 'buyer' && (
+        <div style={{
+          backgroundColor: '#FFFFFF',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--color-border)',
+          padding: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--color-dark)', margin: 0 }}>
+              💼 Want to Sell Products on HomeKart?
+            </h3>
+            <p style={{ color: '#5C6C62', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+              Submit your company GSTIN & bank details for Seller KYC verification to start listing MOQ products.
+            </p>
+          </div>
+
+          <Button
+            variant="primary"
+            onClick={() => setPage('sellerKyc')}
+          >
+            {user.kycStatus === 'pending' ? '⏳ KYC Pending Review' : 'Apply for Seller KYC'}
+          </Button>
+        </div>
+      )}
+
+      {/* Supplier Portal Link Banner for Suppliers */}
+      {userRole === 'supplier' && (
+        <div style={{
+          backgroundColor: '#0F172A',
+          color: '#FFFFFF',
+          borderRadius: 'var(--radius-lg)',
+          padding: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: 'var(--shadow-md)'
+        }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#FFFFFF', margin: 0 }}>
+              🏭 Verified Seller Account Active
+            </h3>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+              Your Seller KYC is approved. List products, set MOQ prices, and track admin product reviews.
+            </p>
+          </div>
+
+          <Button
+            variant="secondary"
+            onClick={() => setPage('supplier')}
+          >
+            Open Supplier Portal
+          </Button>
+        </div>
+      )}
 
       {/* Account statistics */}
       <div style={{

@@ -1,11 +1,23 @@
 import React from 'react';
 import { useHomekart } from '../../store/homekartStore';
-import { Home, ShoppingBasket, Users, ClipboardList, User } from 'lucide-react';
+import { Home, ShoppingBasket, Users, ClipboardList, User, ShieldCheck, Factory } from 'lucide-react';
 
 export const MobileNav: React.FC = () => {
-  const { activePage, setPage, user } = useHomekart();
+  const { activePage, setPage, user, userRole } = useHomekart();
 
-  const navItems = [
+  const navItems = userRole === 'admin' ? [
+    { id: 'admin', label: 'Admin', icon: ShieldCheck },
+    { id: 'shop', label: 'Shop', icon: ShoppingBasket },
+    { id: 'groups', label: 'Groups', icon: Users },
+    { id: 'orders', label: 'Orders', icon: ClipboardList },
+    { id: 'profile', label: 'Profile', icon: User, loginRedirect: true }
+  ] : userRole === 'supplier' ? [
+    { id: 'supplier', label: 'Supplier', icon: Factory },
+    { id: 'shop', label: 'Shop', icon: ShoppingBasket },
+    { id: 'groups', label: 'Groups', icon: Users },
+    { id: 'orders', label: 'Orders', icon: ClipboardList },
+    { id: 'profile', label: 'Profile', icon: User, loginRedirect: true }
+  ] : [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'shop', label: 'Shop', icon: ShoppingBasket },
     { id: 'groups', label: 'Groups', icon: Users },

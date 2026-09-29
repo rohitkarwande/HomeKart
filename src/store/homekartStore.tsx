@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Product, Group, DropPoint, LeaderProfile, Order, Notification, UserProfile, MonthlyBasketItem, GroupStatusType } from '../types';
+import type { Product, Group, DropPoint, LeaderProfile, Order, Notification, UserProfile, MonthlyBasketItem, GroupStatusType, UserRole, SellerKycApplication } from '../types';
 import { SEED_PRODUCTS, SEED_DROP_POINTS, SEED_GROUPS } from '../services/seedData';
 
 // Service Imports
@@ -21,6 +21,44 @@ interface HomekartStore {
   activePage: string;
   pageParams: any;
   setPage: (page: string, params?: any) => void;
+
+  // Real-world User Roles (Buyer, Supplier, Admin)
+  userRole: UserRole;
+  setUserRole: (role: UserRole) => void;
+
+  // Seller KYC Workflow
+  kycApplications: SellerKycApplication[];
+  submitSellerKyc: (kycData: {
+    companyName: string;
+    gstin: string;
+    panNumber: string;
+    businessAddress: string;
+    bankName: string;
+    accountNumber: string;
+    ifscCode: string;
+  }) => Promise<void>;
+  approveSellerKyc: (applicationId: string) => Promise<void>;
+  rejectSellerKyc: (applicationId: string, reason?: string) => Promise<void>;
+
+  // Authentication
+  loginWithPhonePassword: (phone: string, password?: string) => Promise<boolean>;
+  loginAdmin: (email: string, password?: string) => Promise<boolean>;
+  registerUser: (name: string, phone: string, password?: string, interestedCategories?: string[]) => Promise<boolean>;
+  updateUserInterestedCategories: (categories: string[]) => Promise<boolean>;
+
+  // Categories
+  categories: string[];
+  addCategory: (categoryName: string, description?: string) => Promise<void>;
+
+  // Product Listings & Approvals Workflow
+  addSupplierProduct: (productData: Partial<Product>) => Promise<Product>;
+  addAdminProduct: (productData: Partial<Product>) => Promise<Product>;
+  approveProduct: (productId: string) => Promise<void>;
+  rejectProduct: (productId: string) => Promise<void>;
+
+  // Cart Filling Dynamic Pricing & Group Refunds
+  updateGroupPriceByAdmin: (productId: string, newGroupPrice: number) => Promise<void>;
+  processGroupRefund: (groupId: string, reason?: string) => Promise<void>;
 
   // Search & Filter
   searchQuery: string;
@@ -90,6 +128,24 @@ const HomekartContext = createContext<HomekartStore | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'homekart_state_v1';
 
+const SEED_KYC_APPLICATIONS: SellerKycApplication[] = [
+  {
+    id: 'kyc-101',
+    userId: 'usr-9876543210',
+    applicantName: 'Ramesh Patel',
+    phone: '9876543210',
+    companyName: 'Organic Harvest Farms Pvt Ltd',
+    gstin: '27AAAAA0000A1Z5',
+    panNumber: 'ABCDE1234F',
+    businessAddress: 'Plot 42, APMC Market Yard, Vashi, Navi Mumbai, 400703',
+    bankName: 'HDFC Bank',
+    accountNumber: '50100234567890',
+    ifscCode: 'HDFC0001234',
+    submittedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    status: 'pending'
+  }
+];
+
 export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Initialize state
   const [stateLoaded, setStateLoaded] = useState(false);
@@ -99,9 +155,121 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
+  // Seller KYC Applications State
+  const [kycApplications, setKycApplications] = useState<SellerKycApplication[]>(() => {
+    try {
+      const stored = localStorage.getItem('homekart_kyc_apps_v1');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return SEED_KYC_APPLICATIONS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('homekart_kyc_apps_v1', JSON.stringify(kycApplications));
+    } catch (e) {}
+  }, [kycApplications]);
+
   // Core Data sets
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [products, setProducts] = useState<Product[]>(SEED_PRODUCTS);
+
+  // Auto-sync active user's role and kycStatus with approved/rejected kycApplications
+  useEffect(() => {
+    if (!user || user.role === 'admin') return;
+
+    const userPhoneDigits = user.mobile ? user.mobile.replace(/\D/g, '').slice(-10) : '';
+
+    const matchingApp = kycApplications.find(a => {
+      const appPhoneDigits = a.phone ? a.phone.replace(/\D/g, '').slice(-10) : '';
+      return (userPhoneDigits && appPhoneDigits && userPhoneDigits === appPhoneDigits) ||
+             (user.id && a.userId === user.id);
+    });
+
+    if (matchingApp) {
+      if (matchingApp.status === 'approved') {
+        if (user.role !== 'supplier' || user.kycStatus !== 'approved') {
+          setUser(prev => prev ? {
+            ...prev,
+            role: 'supplier',
+            kycStatus: 'approved',
+            kycApplication: matchingApp
+          } : null);
+        }
+      } else if (matchingApp.status === 'rejected') {
+        if (user.kycStatus !== 'rejected') {
+          setUser(prev => prev ? {
+            ...prev,
+            kycStatus: 'rejected',
+            kycApplication: matchingApp
+          } : null);
+        }
+      } else if (matchingApp.status === 'pending') {
+        if (user.kycStatus !== 'pending') {
+          setUser(prev => prev ? {
+            ...prev,
+            kycStatus: 'pending',
+            kycApplication: matchingApp
+          } : null);
+        }
+      }
+    }
+  }, [kycApplications, user?.mobile, user?.id, user?.role, user?.kycStatus]);
+
+  // Core Role derived from User Profile
+  const userRole: UserRole = user?.role || 'buyer';
+  const setUserRole = (role: UserRole) => {
+    if (user) {
+      setUser(prev => prev ? { ...prev, role } : null);
+    }
+  };
+
+  const [categories, setCategories] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('homekart_categories_v1');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+    return [
+      'All',
+      'Vegetables & Fruits',
+      'Tech Products',
+      'Clothes & Fashion',
+      'Salon Products',
+      'Staples',
+      'Personal Care',
+      'Home Essentials',
+      'Dairy & Bakery',
+      'Beverages',
+      'Snacks'
+    ];
+  });
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const stored = localStorage.getItem('homekart_products_v1');
+      if (stored) {
+        const parsed: Product[] = JSON.parse(stored);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+          const merged = [...parsed];
+          SEED_PRODUCTS.forEach(sp => {
+            if (!merged.some(p => p.id === sp.id)) {
+              merged.push(sp);
+            }
+          });
+          return merged;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load initial products from localStorage:', e);
+    }
+    return SEED_PRODUCTS;
+  });
   const [groups, setGroups] = useState<Group[]>([]);
   const [dropPoints, setDropPoints] = useState<DropPoint[]>(SEED_DROP_POINTS);
   const [selectedDropPoint, setSelectedDropPointState] = useState<DropPoint>(SEED_DROP_POINTS[1]); // Powai default
@@ -134,6 +302,23 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Dynamic DB active check shadowing isSupabaseConfigured inside the Provider scope
   const isSupabaseConfigured = isSupabaseConfiguredOriginal && authUserId !== 'mock-user-uuid';
 
+  // Persist products and categories permanently whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('homekart_products_v1', JSON.stringify(products));
+    } catch (e) {
+      console.error('Failed to save products to localStorage:', e);
+    }
+  }, [products]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('homekart_categories_v1', JSON.stringify(categories));
+    } catch (e) {
+      console.error('Failed to save categories to localStorage:', e);
+    }
+  }, [categories]);
+
   // Load database metadata on mount (Products, Groups, Drop Points)
   useEffect(() => {
     const loadMetadata = async () => {
@@ -141,7 +326,17 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setIsLoading(true);
         try {
           const dbProducts = await productService.getProducts();
-          if (dbProducts.length > 0) setProducts(dbProducts);
+          if (dbProducts.length > 0) {
+            setProducts(prev => {
+              const merged = [...dbProducts];
+              prev.forEach(p => {
+                if (!merged.some(dbP => dbP.id === p.id)) {
+                  merged.unshift(p);
+                }
+              });
+              return merged;
+            });
+          }
 
           const dbDropPoints = await dropPointService.getDropPoints();
           if (dbDropPoints.length > 0) {
@@ -323,6 +518,9 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
+        if (parsed.products && Array.isArray(parsed.products) && parsed.products.length > 0) {
+          setProducts(parsed.products);
+        }
         if (parsed.user) setUser(parsed.user);
         if (parsed.groups) setGroups(parsed.groups);
         else setGroups(SEED_GROUPS(SEED_PRODUCTS, SEED_DROP_POINTS));
@@ -362,6 +560,8 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (isSupabaseConfigured || !stateLoaded) return;
     try {
       const stateToStore = {
+        products,
+        categories,
         user,
         groups,
         selectedDropPoint,
@@ -375,7 +575,7 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (e) {
       console.error('Failed to save state to local storage:', e);
     }
-  }, [user, groups, selectedDropPoint, cart, orders, leaderProfile, monthlyBasket, notifications, stateLoaded]);
+  }, [products, categories, user, groups, selectedDropPoint, cart, orders, leaderProfile, monthlyBasket, notifications, stateLoaded]);
 
   // Routing wrapper with auth guard and hash sync
   const setPage = (page: string, params: any = {}) => {
@@ -389,7 +589,8 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       'leader',
       'notifications',
       'profile',
-      'settings'
+      'settings',
+      'sellerKyc'
     ];
 
     if (protectedPages.includes(page) && !user) {
@@ -507,6 +708,12 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (redirect) {
         params = { redirectPage: redirect };
       }
+    } else if (path === '/admin') {
+      page = 'admin';
+    } else if (path === '/supplier') {
+      page = 'supplier';
+    } else if (path === '/sellerKyc') {
+      page = 'sellerKyc';
     } else if (path === '/logout') {
       page = 'logout';
     } else {
@@ -523,7 +730,8 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       'leader',
       'notifications',
       'profile',
-      'settings'
+      'settings',
+      'sellerKyc'
     ];
 
     if (page === 'logout') {
@@ -738,7 +946,7 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         finalName = tempName;
       }
       
-      const profile = { ...existingProfile, name: finalName };
+      const profile = { ...existingProfile, name: finalName, role: userRole };
       setUser(profile);
       
       sessionStorage.removeItem('homekart_temp_name');
@@ -762,7 +970,8 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             { name: 'Rohit Sharma', date: '2026-08-10', amount: 150 },
             { name: 'Amit Kumar', date: '2026-08-12', amount: 150 },
             { name: 'Priya Das', date: '2026-08-14', amount: 150 }
-          ]
+          ],
+          role: userRole
         };
       } else {
         // New user registration
@@ -772,7 +981,8 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           referralCode: (tempName || 'Customer').substring(0, 4).toUpperCase() + Math.floor(100 + Math.random() * 900),
           referralEarnings: 0,
           referralsCount: 0,
-          referralHistory: []
+          referralHistory: [],
+          role: userRole
         };
       }
       setUser(loggedInUser);
@@ -780,12 +990,186 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       sessionStorage.removeItem('homekart_temp_name');
       sessionStorage.removeItem('homekart_temp_mobile');
       sessionStorage.removeItem('homekart_use_mock_otp');
-      await addNotification(`Welcome to Homekart, ${loggedInUser.name}! (Bypass mode)`, 'success');
+      await addNotification(`Welcome to Homekart, ${loggedInUser.name}!`, 'success');
       return true;
     }
 
     await addNotification('Invalid OTP. Please enter 123456 to verify in bypass mode.', 'error');
     return false;
+  };
+
+  // Seller KYC Workflow Implementation
+  const submitSellerKyc = async (kycData: {
+    companyName: string;
+    gstin: string;
+    panNumber: string;
+    businessAddress: string;
+    bankName: string;
+    accountNumber: string;
+    ifscCode: string;
+  }) => {
+    if (!user) return;
+    const newApp: SellerKycApplication = {
+      id: `kyc-${Date.now()}`,
+      userId: user.mobile || user.id || 'usr-1',
+      applicantName: user.name,
+      phone: user.mobile,
+      companyName: kycData.companyName,
+      gstin: kycData.gstin,
+      panNumber: kycData.panNumber,
+      businessAddress: kycData.businessAddress,
+      bankName: kycData.bankName,
+      accountNumber: kycData.accountNumber,
+      ifscCode: kycData.ifscCode,
+      submittedAt: new Date().toISOString(),
+      status: 'pending'
+    };
+
+    setKycApplications(prev => [newApp, ...prev.filter(a => a.phone !== user.mobile)]);
+    const updatedUser: UserProfile = { ...user, kycStatus: 'pending', kycApplication: newApp };
+    setUser(updatedUser);
+    await addNotification(`🎉 Seller KYC Application submitted! Pending Admin verification.`, 'info');
+  };
+
+  const approveSellerKyc = async (applicationId: string) => {
+    let approvedApp: SellerKycApplication | null = null;
+    setKycApplications(prev => prev.map(app => {
+      if (app.id === applicationId) {
+        approvedApp = { ...app, status: 'approved' };
+        return approvedApp;
+      }
+      return app;
+    }));
+
+    const app = approvedApp || kycApplications.find(a => a.id === applicationId);
+    if (app) {
+      const appDigits = app.phone ? app.phone.replace(/\D/g, '').slice(-10) : '';
+      const userDigits = user?.mobile ? user.mobile.replace(/\D/g, '').slice(-10) : '';
+      if (user && user.role !== 'admin' && (userDigits === appDigits || user.id === app.userId)) {
+        setUser({
+          ...user,
+          role: 'supplier',
+          kycStatus: 'approved',
+          kycApplication: { ...app, status: 'approved' }
+        });
+      }
+      await addNotification(`✅ Seller KYC Approved for "${app.applicantName}" (${app.companyName})! Promoted to Verified Seller.`, 'success');
+    }
+  };
+
+  const rejectSellerKyc = async (applicationId: string, reason?: string) => {
+    const rejectionText = reason || 'Business GST/PAN details did not match official registries.';
+    setKycApplications(prev => prev.map(app => {
+      if (app.id === applicationId) {
+        return { ...app, status: 'rejected', rejectionReason: rejectionText };
+      }
+      return app;
+    }));
+
+    const app = kycApplications.find(a => a.id === applicationId);
+    if (app) {
+      const appDigits = app.phone ? app.phone.replace(/\D/g, '').slice(-10) : '';
+      const userDigits = user?.mobile ? user.mobile.replace(/\D/g, '').slice(-10) : '';
+      if (user && user.role !== 'admin' && (userDigits === appDigits || user.id === app.userId)) {
+        setUser({
+          ...user,
+          kycStatus: 'rejected',
+          kycApplication: { ...app, status: 'rejected', rejectionReason: rejectionText }
+        });
+      }
+      await addNotification(`❌ Seller KYC Application for "${app?.applicantName || 'Applicant'}" was rejected.`, 'warning');
+    }
+  };
+
+  // Real Authentication Methods
+  const loginAdmin = async (email: string, password?: string): Promise<boolean> => {
+    if (email.trim().toLowerCase() === 'admin@homekart.com' && (password === 'admin123' || !password)) {
+      const adminUser: UserProfile = {
+        id: 'admin-uuid',
+        name: 'System Administrator',
+        email: 'admin@homekart.com',
+        mobile: '9999900000',
+        role: 'admin',
+        referralCode: 'ADMIN001',
+        referralEarnings: 0,
+        referralsCount: 0,
+        referralHistory: []
+      };
+      setUser(adminUser);
+      await addNotification(`👑 Admin Authentication Successful! Welcome System Admin.`, 'success');
+      setPage('admin');
+      return true;
+    }
+    await addNotification(`Invalid Admin Credentials! Use email: admin@homekart.com / password: admin123`, 'error');
+    return false;
+  };
+
+  const loginWithPhonePassword = async (phone: string, _password?: string): Promise<boolean> => {
+    const formattedPhone = phone.replace(/\D/g, '').slice(-10);
+    if (!formattedPhone || formattedPhone.length < 10) return false;
+
+    // Check if existing approved KYC exists for this phone
+    const existingKyc = kycApplications.find(a => {
+      const appDigits = a.phone ? a.phone.replace(/\D/g, '').slice(-10) : '';
+      return appDigits === formattedPhone;
+    });
+    const isApprovedSeller = existingKyc && existingKyc.status === 'approved';
+    const role: UserRole = isApprovedSeller ? 'supplier' : 'buyer';
+
+    const loggedUser: UserProfile = {
+      id: `usr-${formattedPhone}`,
+      name: formattedPhone === '9999988888' ? 'Sneha Sharma' : `User ${formattedPhone.slice(-4)}`,
+      mobile: formattedPhone,
+      referralCode: `HK${formattedPhone.slice(-5)}`,
+      referralEarnings: 150,
+      referralsCount: 1,
+      referralHistory: [],
+      role,
+      kycStatus: existingKyc ? existingKyc.status : 'none',
+      kycApplication: existingKyc
+    };
+
+    setUser(loggedUser);
+    await addNotification(`Welcome back, ${loggedUser.name}! Logged in as ${role.toUpperCase()}.`, 'success');
+    if (role === 'supplier') setPage('supplier');
+    else setPage('shop');
+    return true;
+  };
+
+  const registerUser = async (name: string, phone: string, _password?: string, interestedCategories?: string[]): Promise<boolean> => {
+    const formattedPhone = phone.replace(/\D/g, '').slice(-10);
+    const newUser: UserProfile = {
+      id: `usr-${formattedPhone}`,
+      name: name.trim() || 'New Buyer',
+      mobile: formattedPhone,
+      referralCode: (name || 'HK').slice(0, 4).toUpperCase() + Math.floor(100 + Math.random() * 900),
+      referralEarnings: 0,
+      referralsCount: 0,
+      referralHistory: [],
+      role: 'buyer',
+      kycStatus: 'none',
+      interestedCategories: interestedCategories || ['Vegetables & Fruits', 'Tech Products']
+    };
+
+    setUser(newUser);
+    if (isSupabaseConfigured && authUserId) {
+      await authService.updateInterestedCategories(authUserId, newUser.interestedCategories || []);
+    }
+    await addNotification(`Welcome to HomeKart, ${newUser.name}! Your feed is tailored to your chosen categories.`, 'success');
+    setPage('home');
+    return true;
+  };
+
+  const updateUserInterestedCategories = async (categories: string[]): Promise<boolean> => {
+    if (!user) {
+      return false;
+    }
+    if (isSupabaseConfigured && authUserId) {
+      await authService.updateInterestedCategories(authUserId, categories);
+    }
+    setUser(prev => prev ? { ...prev, interestedCategories: categories } : null);
+    await addNotification('Your interested categories have been updated!', 'info');
+    return true;
   };
 
   const updateProfile = async (newName: string): Promise<boolean> => {
@@ -843,46 +1227,41 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Cart Management
   const addToCart = async (product: Product, quantity: number, isGroupBuy: boolean, groupId?: string) => {
-    let targetLimit = 5;
-    if (groupId) {
-      const g = groups.find(x => x.id === groupId);
-      if (g) {
-        targetLimit = Math.max(1, g.targetMembers - g.currentMembers);
-      }
-    }
-
-    if (isGroupBuy && quantity > targetLimit) {
-      addNotification(`Quantity restricted: You can only add up to the remaining group capacity of ${targetLimit} items.`, 'warning');
-      quantity = targetLimit;
-    }
+    const newItem = { product, quantity, isGroupBuy, groupId };
 
     if (isSupabaseConfigured && authUserId) {
       const success = await cartService.addToCart(authUserId, product.id, quantity, isGroupBuy, groupId);
       if (success) {
         const dbCart = await cartService.getCart(authUserId);
-        setCart(dbCart);
-      }
-    } else {
-      setCart(prev => {
-        const index = prev.findIndex(item => 
-          item.product.id === product.id && 
-          item.isGroupBuy === isGroupBuy && 
-          (item.groupId || undefined) === (groupId || undefined)
-        );
-        if (index > -1) {
-          const copy = [...prev];
-          const newQty = copy[index].quantity + quantity;
-          if (newQty > targetLimit) {
-            addNotification(`Quantity restricted: You can only add up to the remaining group capacity of ${targetLimit} items.`, 'warning');
-            copy[index].quantity = targetLimit;
-          } else {
-            copy[index].quantity = newQty;
-          }
-          return copy;
+        if (dbCart && dbCart.length > 0) {
+          setCart(dbCart);
+          addNotification(`Added ${product.name} to Cart.`, 'success');
+          return;
         }
-        return [...prev, { product, quantity, isGroupBuy, groupId }];
-      });
+      }
     }
+
+    setCart(prev => {
+      const index = prev.findIndex(item => 
+        item.product.id === product.id && 
+        item.isGroupBuy === isGroupBuy && 
+        (item.groupId || undefined) === (groupId || undefined)
+      );
+      let nextCart;
+      if (index > -1) {
+        const copy = [...prev];
+        copy[index].quantity += quantity;
+        nextCart = copy;
+      } else {
+        nextCart = [...prev, newItem];
+      }
+      try {
+        localStorage.setItem('homekart_anonymous_cart', JSON.stringify(nextCart));
+      } catch (e) {
+        console.error('Error saving anonymous cart:', e);
+      }
+      return nextCart;
+    });
     addNotification(`Added ${product.name} to Cart.`, 'success');
   };
 
@@ -890,14 +1269,21 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (isSupabaseConfigured && authUserId) {
       await cartService.removeFromCart(authUserId, productId, isGroupBuy, groupId);
       const dbCart = await cartService.getCart(authUserId);
-      setCart(dbCart);
-    } else {
-      setCart(prev => prev.filter(item => !(
+      if (dbCart) {
+        setCart(dbCart);
+      }
+    }
+    setCart(prev => {
+      const nextCart = prev.filter(item => !(
         item.product.id === productId && 
         item.isGroupBuy === isGroupBuy && 
         (item.groupId || undefined) === (groupId || undefined)
-      )));
-    }
+      ));
+      try {
+        localStorage.setItem('homekart_anonymous_cart', JSON.stringify(nextCart));
+      } catch (e) {}
+      return nextCart;
+    });
   };
 
   const updateCartQuantity = async (productId: string, quantity: number, isGroupBuy: boolean, groupId?: string) => {
@@ -906,30 +1292,26 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
 
-    let targetLimit = 5;
-    if (groupId) {
-      const g = groups.find(x => x.id === groupId);
-      if (g) {
-        targetLimit = Math.max(1, g.targetMembers - g.currentMembers);
-      }
-    }
-
-    if (isGroupBuy && quantity > targetLimit) {
-      addNotification(`Quantity restricted: You can only add up to the remaining group capacity of ${targetLimit} items.`, 'warning');
-      quantity = targetLimit;
-    }
-
     if (isSupabaseConfigured && authUserId) {
       await cartService.updateQuantity(authUserId, productId, isGroupBuy, groupId, quantity);
       const dbCart = await cartService.getCart(authUserId);
-      setCart(dbCart);
-    } else {
-      setCart(prev => prev.map(item => 
+      if (dbCart && dbCart.length > 0) {
+        setCart(dbCart);
+        return;
+      }
+    }
+
+    setCart(prev => {
+      const nextCart = prev.map(item => 
         (item.product.id === productId && item.isGroupBuy === isGroupBuy && (item.groupId || undefined) === (groupId || undefined)) 
           ? { ...item, quantity } 
           : item
-      ));
-    }
+      );
+      try {
+        localStorage.setItem('homekart_anonymous_cart', JSON.stringify(nextCart));
+      } catch (e) {}
+      return nextCart;
+    });
   };
 
   const clearCart = async () => {
@@ -938,6 +1320,7 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setCart([]);
     } else {
       setCart([]);
+      localStorage.removeItem('homekart_anonymous_cart');
     }
     setPromoDiscount(0);
     setAppliedPromoCode('');
@@ -946,23 +1329,35 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Join group directly
   const joinGroupDirectly = async (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
-    if (!group) return;
+    if (!group) {
+      addNotification('Group deal not found.', 'error');
+      return;
+    }
     if (group.currentMembers >= group.targetMembers) {
       addNotification(`This group is already full and confirmed! You cannot join it.`, 'warning');
       return;
     }
-    const prod = products.find(p => p.id === group.productId);
-    if (!prod) return;
 
-    if (isSupabaseConfigured && authUserId) {
-      await cartService.clearCart(authUserId);
-      await cartService.addToCart(authUserId, prod.id, 1, true, group.id);
-      const dbCart = await cartService.getCart(authUserId);
-      setCart(dbCart);
-    } else {
-      setCart([{ product: prod, quantity: 1, isGroupBuy: true, groupId: group.id }]);
+    let prod = products.find(p => p.id === group.productId);
+    if (!prod) {
+      prod = {
+        id: group.productId || `prod-${group.id}`,
+        name: group.productName || 'Homekart Group Deal Product',
+        description: 'Quality group buy product.',
+        category: 'Staples',
+        originalPrice: group.originalPrice || 500,
+        groupPrice: group.groupPrice || 350,
+        imageUrl: group.productImage || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop&q=80',
+        rating: 4.8,
+        reviewsCount: 12,
+        specifications: {},
+        availability: 'in-stock',
+        companyName: group.companyName
+      };
     }
-    setPage('checkout');
+
+    await addToCart(prod, 1, true, group.id);
+    setPage('cart');
   };
 
   const createGroupForProduct = async (productId: string): Promise<string> => {
@@ -1109,7 +1504,7 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const subtotal = cart.reduce((sum, item) => sum + (item.product.originalPrice * item.quantity), 0);
     const cartTotal = cart.reduce((sum, item) => {
-      const price = calculateDynamicPrice(item.product, item.isGroupBuy, item.groupId, groups);
+      const price = calculateDynamicPrice(item.product, item.isGroupBuy, item.groupId, groups, item.quantity);
       return sum + (price * item.quantity);
     }, 0);
     const finalTotal = Math.max(0, cartTotal - promoDiscount);
@@ -1117,68 +1512,72 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const isGroupBuyOrder = cart.some(item => item.isGroupBuy);
 
     if (isSupabaseConfigured && authUserId) {
-      let associatedGroupId = cart[0].groupId;
-      let groupStatus = 'N/A';
+      try {
+        let associatedGroupId = cart[0].groupId;
+        let groupStatus = 'N/A';
 
-      if (isGroupBuyOrder) {
-        if (associatedGroupId) {
-          await groupService.joinGroup(associatedGroupId, authUserId);
+        if (isGroupBuyOrder) {
+          if (associatedGroupId) {
+            await groupService.joinGroup(associatedGroupId, authUserId);
+            const dbGroups = await groupService.getGroups();
+            const existingGroup = dbGroups.find(g => g.id === associatedGroupId);
+            groupStatus = existingGroup ? existingGroup.status : 'Joining';
+          } else {
+            const newGrpId = await groupService.createGroup(cart[0].product.id, authUserId, selectedDropPoint.id, cart[0].product.groupPrice);
+            associatedGroupId = newGrpId || undefined;
+            groupStatus = 'Open';
+          }
+        }
+
+        const dbOrder = await orderService.createOrder(
+          authUserId,
+          cart,
+          selectedDropPoint,
+          paymentMethod,
+          subtotal,
+          savings,
+          finalTotal,
+          associatedGroupId,
+          associatedGroupId ? 'group_pending' : 'paid'
+        );
+
+        if (dbOrder) {
+          await cartService.clearCart(authUserId);
+          setCart([]);
+          setPromoDiscount(0);
+          setAppliedPromoCode('');
+
           const dbGroups = await groupService.getGroups();
-          const existingGroup = dbGroups.find(g => g.id === associatedGroupId);
-          groupStatus = existingGroup ? existingGroup.status : 'Joining';
-        } else {
-          const newGrpId = await groupService.createGroup(cart[0].product.id, authUserId, selectedDropPoint.id, cart[0].product.groupPrice);
-          associatedGroupId = newGrpId || undefined;
-          groupStatus = 'Open';
+          setGroups(dbGroups);
+
+          const dbOrders = await orderService.getOrders(authUserId);
+          setOrders(dbOrders);
+
+          // Timers simulation
+          if (isGroupBuyOrder && associatedGroupId && groupStatus !== 'Confirmed') {
+            const gId = associatedGroupId;
+            setTimeout(async () => {
+              await simulateFriendJoin(gId);
+            }, 5000);
+          } else if (isGroupBuyOrder && associatedGroupId && groupStatus === 'Confirmed') {
+            const gId = associatedGroupId;
+            setTimeout(async () => {
+              await supabase.from('orders').update({
+                status: 'ready_for_pickup',
+                pickup_status: 'ready_for_pickup'
+              }).eq('group_id', gId);
+
+              const dbOrders = await orderService.getOrders(authUserId);
+              setOrders(dbOrders);
+              addNotification(`Your group order is ready for pickup!`, 'success');
+            }, 8000);
+          }
+
+          return dbOrder;
         }
+      } catch (dbErr) {
+        console.error('Error placing order in DB, using fallback order generation:', dbErr);
       }
-
-      const dbOrder = await orderService.createOrder(
-        authUserId,
-        cart,
-        selectedDropPoint,
-        paymentMethod,
-        subtotal,
-        savings,
-        finalTotal,
-        associatedGroupId,
-        associatedGroupId ? 'group_pending' : 'paid'
-      );
-
-      if (dbOrder) {
-        await cartService.clearCart(authUserId);
-        setCart([]);
-        setPromoDiscount(0);
-        setAppliedPromoCode('');
-
-        const dbGroups = await groupService.getGroups();
-        setGroups(dbGroups);
-
-        const dbOrders = await orderService.getOrders(authUserId);
-        setOrders(dbOrders);
-
-        // Timers simulation
-        if (isGroupBuyOrder && associatedGroupId && groupStatus !== 'Confirmed') {
-          const gId = associatedGroupId;
-          setTimeout(async () => {
-            await simulateFriendJoin(gId);
-          }, 5000);
-        } else if (isGroupBuyOrder && associatedGroupId && groupStatus === 'Confirmed') {
-          const gId = associatedGroupId;
-          setTimeout(async () => {
-            await supabase.from('orders').update({
-              status: 'ready_for_pickup',
-              pickup_status: 'ready_for_pickup'
-            }).eq('group_id', gId);
-
-            const dbOrders = await orderService.getOrders(authUserId);
-            setOrders(dbOrders);
-            addNotification(`Your group order is ready for pickup!`, 'success');
-          }, 8000);
-        }
-      }
-
-      return dbOrder;
     }
 
     // LocalStorage prototype mode
@@ -1277,33 +1676,57 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const cancelOrder = async (orderId: string) => {
+    const refundTxnId = `REF-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    setOrders(prev => prev.map(ord => {
+      if (ord.id !== orderId) return ord;
+      return {
+        ...ord,
+        groupStatus: 'Cancelled',
+        paymentStatus: 'Refund Initiated',
+        refundDetails: {
+          amount: ord.total,
+          date: new Date().toISOString(),
+          reason: 'Order cancelled by buyer before pickup.',
+          transactionId: refundTxnId
+        },
+        timeline: [
+          { title: 'ORDER PLACED', date: new Date(ord.date).toLocaleDateString(), completed: true },
+          { title: 'ORDER CANCELLED', date: 'Just now', completed: true },
+          { title: 'REFUND INITIATED', date: 'Just now', completed: true },
+          { title: 'REFUND COMPLETED', date: 'Pending', completed: false }
+        ]
+      } as Order;
+    }));
+
+    await addNotification(`Order #${orderId} cancelled. Refund initiated!`, 'warning');
+
     if (isSupabaseConfigured && authUserId) {
-      const success = await orderService.cancelOrder(orderId);
-      if (success) {
-        const dbOrders = await orderService.getOrders(authUserId);
-        setOrders(dbOrders);
-        addNotification('Order cancelled. Refund initiated.', 'warning');
+      try {
+        await orderService.cancelOrder(orderId);
+      } catch (e) {
+        console.error('Error cancelling order in Supabase DB:', e);
       }
-    } else {
+    }
+
+    // Simulate refund completion after 4 seconds
+    setTimeout(() => {
       setOrders(prev => prev.map(ord => {
         if (ord.id !== orderId) return ord;
-        setTimeout(() => {
-          setOrders(latest => latest.map(o => o.id === orderId ? { ...o, paymentStatus: 'Refunded' as any } : o));
-          addNotification('Refund completed.', 'info');
-        }, 6000);
-
         return {
           ...ord,
+          paymentStatus: 'Refunded',
           groupStatus: 'Cancelled',
-          paymentStatus: 'Refund Initiated',
           timeline: [
-            { title: 'GROUP CANCELLED', date: 'Just now', completed: true },
+            { title: 'ORDER PLACED', date: new Date(ord.date).toLocaleDateString(), completed: true },
+            { title: 'ORDER CANCELLED', date: 'Just now', completed: true },
             { title: 'REFUND INITIATED', date: 'Just now', completed: true },
-            { title: 'REFUND COMPLETED', date: 'Pending', completed: false }
+            { title: 'REFUND COMPLETED', date: 'Just now', completed: true }
           ]
         } as Order;
       }));
-    }
+      addNotification(`Money refund of ₹${refundTxnId} for Order #${orderId} completed successfully!`, 'info');
+    }, 4000);
   };
 
   const completeOrder = async (orderId: string) => {
@@ -1560,11 +1983,218 @@ export const HomekartProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  // Actions for Roles, Supplier Listing, Approvals, Dynamic Pricing & Refunds
+  const addSupplierProduct = async (productData: Partial<Product>): Promise<Product> => {
+    const newProduct: Product = {
+      id: `prod-sup-${Date.now()}`,
+      name: productData.name || 'New Supplier Product',
+      description: productData.description || 'Quality product supplied by verified partner seller.',
+      category: productData.category || 'Staples',
+      originalPrice: Number(productData.originalPrice) || 500,
+      groupPrice: Number(productData.groupPrice) || 350,
+      imageUrl: productData.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop&q=80',
+      rating: 4.8,
+      reviewsCount: 1,
+      specifications: productData.specifications || { 'Company': productData.companyName || 'Supplier' },
+      availability: 'in-stock',
+      sellerRole: 'supplier',
+      companyName: productData.companyName || 'Registered Supplier Co.',
+      moq: Number(productData.moq) || 20,
+      approvalStatus: 'pending', // Starts pending admin approval!
+      submittedBy: user ? user.name : 'Supplier Partner',
+      deliveryEstDate: '1 October to 7 October'
+    };
+
+    if (isSupabaseConfigured) {
+      await productService.createProduct(newProduct);
+    }
+
+    setProducts(prev => [newProduct, ...prev]);
+    await addNotification(`📋 Supplier Listing "${newProduct.name}" submitted! Pending Admin approval before appearing in Shop.`, 'info');
+    return newProduct;
+  };
+
+  const addAdminProduct = async (productData: Partial<Product>): Promise<Product> => {
+    const newProduct: Product = {
+      id: `prod-adm-${Date.now()}`,
+      name: productData.name || 'Admin Direct Item',
+      description: productData.description || 'Directly published item by HomeKart Admin.',
+      category: productData.category || 'Staples',
+      originalPrice: Number(productData.originalPrice) || 500,
+      groupPrice: Number(productData.groupPrice) || 350,
+      imageUrl: productData.imageUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop&q=80',
+      rating: 5.0,
+      reviewsCount: 10,
+      specifications: productData.specifications || { 'Seller': 'HomeKart Admin Direct' },
+      availability: 'in-stock',
+      sellerRole: 'admin',
+      companyName: 'HomeKart Direct',
+      moq: Number(productData.moq) || 10,
+      approvalStatus: 'approved',
+      submittedBy: 'Admin',
+      deliveryEstDate: '1 October to 7 October'
+    };
+
+    if (isSupabaseConfigured) {
+      await productService.createProduct(newProduct);
+    }
+
+    setProducts(prev => [newProduct, ...prev]);
+
+    // Create an initial group for the direct admin product
+    const newGroup: Group = {
+      id: `grp-${Date.now()}`,
+      productId: newProduct.id,
+      productName: newProduct.name,
+      productImage: newProduct.imageUrl,
+      groupPrice: newProduct.groupPrice,
+      originalPrice: newProduct.originalPrice,
+      savings: newProduct.originalPrice - newProduct.groupPrice,
+      currentMembers: 1,
+      targetMembers: newProduct.moq || 5,
+      memberNames: ['HomeKart Community'],
+      status: 'Open',
+      deadline: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      dropPointId: selectedDropPoint.id,
+      dropPointName: selectedDropPoint.name,
+      moq: newProduct.moq,
+      companyName: newProduct.companyName
+    };
+    setGroups(prev => [newGroup, ...prev]);
+
+    await addNotification(`✨ Product "${newProduct.name}" directly published to Shop!`, 'success');
+    return newProduct;
+  };
+
+  const approveProduct = async (productId: string) => {
+    let approvedProd: Product | null = null;
+    setProducts(prev => prev.map(p => {
+      if (p.id === productId) {
+        approvedProd = { ...p, approvalStatus: 'approved' };
+        return approvedProd;
+      }
+      return p;
+    }));
+
+    const targetProd = approvedProd || products.find(p => p.id === productId);
+    if (targetProd) {
+      // Auto-create a buying group for the newly approved product if none exists
+      const existingGrp = groups.find(g => g.productId === productId);
+      if (!existingGrp) {
+        const newGroup: Group = {
+          id: `grp-${Date.now()}`,
+          productId: targetProd.id,
+          productName: targetProd.name,
+          productImage: targetProd.imageUrl,
+          groupPrice: targetProd.groupPrice,
+          originalPrice: targetProd.originalPrice,
+          savings: targetProd.originalPrice - targetProd.groupPrice,
+          currentMembers: 1,
+          targetMembers: targetProd.moq || 5,
+          memberNames: [targetProd.companyName || targetProd.submittedBy || 'Verified Supplier'],
+          status: 'Open',
+          deadline: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+          dropPointId: selectedDropPoint.id,
+          dropPointName: selectedDropPoint.name,
+          moq: targetProd.moq,
+          companyName: targetProd.companyName
+        };
+        setGroups(prev => [newGroup, ...prev]);
+      }
+      await addNotification(`🎉 Product "${targetProd.name}" has been APPROVED by Admin and is live for Buyers!`, 'success');
+    }
+  };
+
+  const rejectProduct = async (productId: string) => {
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, approvalStatus: 'rejected' } : p));
+    const targetProd = products.find(p => p.id === productId);
+    await addNotification(`Product "${targetProd?.name || 'Item'}" rejected by Admin.`, 'warning');
+  };
+
+  const addCategory = async (categoryName: string) => {
+    const trimmed = categoryName.trim();
+    if (!trimmed) return;
+    if (!categories.includes(trimmed)) {
+      setCategories(prev => [...prev, trimmed]);
+      await addNotification(`New category "${trimmed}" added successfully by Admin!`, 'success');
+    }
+  };
+
+  const updateGroupPriceByAdmin = async (productId: string, newGroupPrice: number) => {
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, groupPrice: newGroupPrice } : p));
+
+    setGroups(prev => prev.map(g => {
+      if (g.productId === productId) {
+        const newSavings = g.originalPrice - newGroupPrice;
+        return { ...g, groupPrice: newGroupPrice, savings: newSavings, adminPriceModified: true };
+      }
+      return g;
+    }));
+
+    setCart(prev => prev.map(item => {
+      if (item.product.id === productId) {
+        return {
+          ...item,
+          product: { ...item.product, groupPrice: newGroupPrice }
+        };
+      }
+      return item;
+    }));
+
+    const prod = products.find(p => p.id === productId);
+    await addNotification(`⚡ Price Override Applied! Group price for "${prod?.name || 'Product'}" reduced to ₹${newGroupPrice}.`, 'success');
+  };
+
+  const processGroupRefund = async (groupId: string, reason?: string) => {
+    const group = groups.find(g => g.id === groupId);
+    const refundReasonText = reason || 'Group MOQ target not filled within delivery launch period.';
+
+    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, status: 'Cancelled' } : g));
+
+    setOrders(prev => prev.map(ord => {
+      const containsProduct = group && ord.items.some(i => i.productId === group.productId);
+      if (ord.groupId === groupId || containsProduct) {
+        return {
+          ...ord,
+          groupStatus: 'Cancelled',
+          paymentStatus: 'Refunded',
+          refundDetails: {
+            amount: ord.total,
+            date: new Date().toISOString(),
+            reason: refundReasonText,
+            transactionId: `REF-${Math.floor(100000 + Math.random() * 900000)}`
+          }
+        };
+      }
+      return ord;
+    }));
+
+    await addNotification(`💸 Money Refund Initiated for "${group?.productName || 'Order'}". Amount returned to buyers.`, 'warning');
+  };
+
   return (
     <HomekartContext.Provider value={{
       activePage,
       pageParams,
       setPage,
+      userRole,
+      setUserRole,
+      kycApplications,
+      submitSellerKyc,
+      approveSellerKyc,
+      rejectSellerKyc,
+      loginWithPhonePassword,
+      loginAdmin,
+      registerUser,
+      updateUserInterestedCategories,
+      categories,
+      addCategory,
+      addSupplierProduct,
+      addAdminProduct,
+      approveProduct,
+      rejectProduct,
+      updateGroupPriceByAdmin,
+      processGroupRefund,
       searchQuery,
       setSearchQuery: handleSetSearchQuery,
       selectedCategory,

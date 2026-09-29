@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useHomekart } from '../store/homekartStore';
-import { calculateDynamicPrice } from '../utils/pricing';
+import { calculateDynamicPrice, isFirstGroupMember, calculateFirstUserBonus } from '../utils/pricing';
 import { Button } from '../components/common/Button';
 import { 
   ArrowLeft, 
@@ -36,14 +36,19 @@ export const Checkout: React.FC = () => {
   }
 
   // Cost calculations
-  const subtotal = cart.reduce((sum, item) => sum + (item.product.originalPrice * item.quantity), 0);
-  const cartTotal = cart.reduce((sum, item) => {
-    const price = calculateDynamicPrice(item.product, item.isGroupBuy, item.groupId, groups);
-    return sum + (price * item.quantity);
+  const itemSubtotal = cart.reduce((sum, item) => {
+    const basePrice = item.isGroupBuy ? item.product.groupPrice : item.product.originalPrice;
+    return sum + (basePrice * item.quantity);
   }, 0);
-  const groupSavings = subtotal - cartTotal;
+
+  const firstMemberBonusTotal = cart.reduce((sum, item) => {
+    const isFirstUser = isFirstGroupMember(item.groupId, groups);
+    const bonusPerUnit = calculateFirstUserBonus(item.product, item.isGroupBuy, item.quantity, isFirstUser);
+    return sum + (bonusPerUnit * item.quantity);
+  }, 0);
+
   const applicableCharges = 0; // Free Pickup
-  const netTotal = Math.max(0, subtotal - groupSavings + applicableCharges - promoDiscount);
+  const netTotal = Math.max(0, itemSubtotal - firstMemberBonusTotal + applicableCharges - promoDiscount);
 
   const handleApplyPromo = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,7 +319,7 @@ export const Checkout: React.FC = () => {
                     {item.product.name} (x{item.quantity})
                   </span>
                   <span style={{ fontWeight: 700 }}>
-                    ₹{calculateDynamicPrice(item.product, item.isGroupBuy, item.groupId, groups) * item.quantity}
+                    ₹{calculateDynamicPrice(item.product, item.isGroupBuy, item.groupId, groups, item.quantity) * item.quantity}
                   </span>
                 </div>
               ))}
@@ -323,13 +328,13 @@ export const Checkout: React.FC = () => {
             {/* Subtotals list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderBottom: '1px solid var(--color-border)', paddingBottom: '16px', fontSize: '0.9rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#5C6C62' }}>
-                <span>Subtotal (Normal Price)</span>
-                <span>₹{subtotal}</span>
+                <span>Subtotal</span>
+                <span>₹{itemSubtotal}</span>
               </div>
-              {groupSavings > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-primary)', fontWeight: 600 }}>
-                  <span>Group Buying Discount</span>
-                  <span>-₹{groupSavings}</span>
+              {firstMemberBonusTotal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#10B981', fontWeight: 700 }}>
+                  <span>👑 First Member Bonus (10% Extra Off)</span>
+                  <span>-₹{firstMemberBonusTotal}</span>
                 </div>
               )}
               {promoApplied && (

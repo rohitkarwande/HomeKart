@@ -8,14 +8,20 @@ import { Clock, MapPin, Sparkles, UserPlus } from 'lucide-react';
 export const Groups: React.FC = () => {
   const { 
     groups, 
+    products,
     joinGroupDirectly, 
     simulateFriendJoin, 
     setPage,
     addNotification,
-    user
+    user,
+    addToCart
   } = useHomekart();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'open' | 'almost-full' | 'confirmed' | 'my'>('all');
+  const [showStartGroupModal, setShowStartGroupModal] = useState(false);
+
+  // Available approved products for starting a new group deal
+  const approvedProducts = products.filter(p => p.approvalStatus === 'approved' || !p.approvalStatus);
 
   const filteredGroups = groups.filter(grp => {
     if (activeFilter === 'my') {
@@ -34,17 +40,47 @@ export const Groups: React.FC = () => {
     addNotification('A friend joined the group! Progress updated.', 'info');
   };
 
+  const handleStartGroup = async (product: any) => {
+    setShowStartGroupModal(false);
+    addToCart(product, 1, true);
+    setPage('cart');
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }} className="animate-fade-in">
       
       {/* Header */}
-      <div>
-        <h1 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-display)', marginBottom: '8px' }}>
-          Active Group Deals
-        </h1>
-        <p style={{ color: '#5C6C62' }}>
-          Join a group in your area to save. Or start a group by browsing products and purchasing at group price.
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h1 style={{ fontSize: '2.5rem', fontFamily: 'var(--font-display)', marginBottom: '8px' }}>
+            Active Group Deals
+          </h1>
+          <p style={{ color: '#5C6C62' }}>
+            Join a group in your area to save. Or start a new group deal for any product.
+          </p>
+        </div>
+        <Button variant="primary" onClick={() => setShowStartGroupModal(true)}>
+          <Sparkles size={18} /> Start New Group Deal
+        </Button>
+      </div>
+
+      {/* First Member Bonus Incentive Announcement */}
+      <div style={{
+        backgroundColor: '#ECFDF5',
+        border: '1px solid #10B981',
+        borderRadius: 'var(--radius-md)',
+        padding: '14px 20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        fontSize: '0.9rem',
+        color: '#065F46',
+        fontWeight: 600
+      }}>
+        <span style={{ fontSize: '1.2rem' }}>👑</span>
+        <span>
+          <strong>First Member Special:</strong> Be the first to enter or start a group deal with <strong>minimum 5 quantity</strong> to unlock an <strong>EXTRA 10% BONUS DISCOUNT</strong> on top of group prices!
+        </span>
       </div>
 
       {/* Filter Tabs */}
@@ -142,10 +178,10 @@ export const Groups: React.FC = () => {
                     }}>
                       {grp.productName}
                     </h3>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', marginTop: '4px' }}>
-                      <span style={{ color: 'var(--color-primary)', fontWeight: 800 }}>₹{grp.groupPrice}</span>
-                      <span style={{ textDecoration: 'line-through', color: 'var(--color-error)', fontSize: '0.8rem' }}>₹{grp.originalPrice}</span>
-                      <span style={{ color: 'var(--color-green-bright)', fontSize: '0.75rem', fontWeight: 700 }}>Save ₹{grp.savings}</span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', marginTop: '4px', flexWrap: 'wrap' }}>
+                      <span style={{ color: 'var(--color-primary)', fontWeight: 800 }}>Our App: ₹{grp.groupPrice}</span>
+                      <span style={{ textDecoration: 'line-through', color: 'var(--color-error)', fontSize: '0.8rem' }}>Other Apps: ₹{grp.originalPrice}</span>
+                      <span style={{ backgroundColor: '#10B981', color: '#FFFFFF', fontSize: '0.7rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px' }}>20% Lower</span>
                     </div>
                   </div>
                 </div>
@@ -292,6 +328,90 @@ export const Groups: React.FC = () => {
           <Button onClick={() => setPage('shop')}>
             Browse Products
           </Button>
+        </div>
+      )}
+
+      {/* Start New Group Deal Modal */}
+      {showStartGroupModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 1000,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 'var(--radius-lg)',
+            padding: '28px',
+            width: '100%',
+            maxWidth: '640px',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            boxShadow: 'var(--shadow-xl)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>Start a New Group Deal</h3>
+                <p style={{ fontSize: '0.85rem', color: '#5C6C62', margin: '4px 0 0 0' }}>
+                  Select any approved product below to start a new buying group deal.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowStartGroupModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: '#5C6C62'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {approvedProducts.map(p => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--color-off-white)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <img src={p.imageUrl} alt={p.name} style={{ width: '48px', height: '48px', borderRadius: '6px', objectFit: 'cover' }} />
+                    <div>
+                      <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>{p.name}</h4>
+                      <span style={{ fontSize: '0.75rem', color: '#5C6C62' }}>
+                        {p.companyName || 'HomeKart'} · Group Offer: <strong style={{ color: 'var(--color-primary)' }}>₹{p.groupPrice}</strong> (Save ₹{p.originalPrice - p.groupPrice})
+                      </span>
+                    </div>
+                  </div>
+                  <Button variant="primary" size="sm" onClick={() => handleStartGroup(p)}>
+                    Start Group
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

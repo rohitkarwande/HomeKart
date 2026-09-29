@@ -106,6 +106,60 @@ export const productService = {
       availability: data.stock > 0 ? 'in-stock' : 'out-of-stock',
       expiresAt: data.expires_at || undefined
     };
+  },
+
+  async createProduct(product: Partial<Product>): Promise<Product | null> {
+    if (!isSupabaseConfigured) return null;
+
+    try {
+      const slug = (product.name || 'product')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '') + '-' + Date.now().toString().slice(-4);
+
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          name: product.name,
+          slug,
+          description: product.description || '',
+          original_price: product.originalPrice,
+          group_price: product.groupPrice,
+          image_url: product.imageUrl,
+          stock: 100,
+          is_active: true
+        })
+        .select()
+        .single();
+
+      if (error || !data) {
+        console.error('Error inserting product into Supabase:', error?.message);
+        return null;
+      }
+
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        category: product.category || 'Staples',
+        originalPrice: data.original_price,
+        groupPrice: data.group_price,
+        imageUrl: data.image_url || '',
+        rating: 5.0,
+        reviewsCount: 1,
+        specifications: product.specifications || buildSpecifications(data.name, data.description || ''),
+        availability: 'in-stock',
+        sellerRole: product.sellerRole,
+        companyName: product.companyName,
+        moq: product.moq,
+        approvalStatus: product.approvalStatus,
+        submittedBy: product.submittedBy,
+        deliveryEstDate: product.deliveryEstDate
+      };
+    } catch (e) {
+      console.error('Failed to create product in DB:', e);
+      return null;
+    }
   }
 };
 
